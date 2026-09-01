@@ -27,3 +27,13 @@ A fresh reload after the Triage check resets to onboarding with 103 hrs Availabl
 The clean dashboard shows the corrected trend reference and all seven daily dot values. The Quick Check floating action “Can I afford this?” is visible at the bottom-right and is separate from the Add Task action.
 
 Quick Check verification: opening the floating action displays the read-only overlay; entering “lab report” and 4 hrs changes the preview from 95.5 hrs to 91.5 hrs while the dashboard behind it remains unchanged. Closing returns to the same 95.5 hrs dashboard with the original three active tasks. Add to Schedule routes to a blank Commitment Mirror with the estimate flow ready and does not mutate the dashboard directly.
+
+The revised onboarding remains intentionally recovery-first: it shows 103 hrs available before flexible commitments. The loaded demo task set is introduced when Start Planning enters Dashboard, preserving the setup calculation while making the next-commitment demo meaningfully loaded.
+
+Loaded-demo dashboard validation: entering Dashboard now shows 6 active tasks, 86 hrs weekly Recovery Margin, Thu at 0.5h, and status dots calibrated as Mon green, Tue green, Wed green, Thu red, Fri amber, Sat green, Sun green. This makes the Thursday recovery consequence visible before adding a new task while keeping the rest of the week comfortable.
+
+The loaded dashboard exposes six active flexible commitments, including four mental-load tasks due Thursday totalling 13.5 hrs. A moderate new task can now be tested against this concentrated Thursday load; Add Task is reachable at the dashboard action row.
+
+Commitment Mirror demo validation: with the loaded Thursday week, a 4-hour “lab report” shows “Thu sleep 7h → 6.5h” even though weekly margin remains comfortable at 82 hrs. The 290-hour version shows -204 hrs after accepting, “Thu sleep 7h → 0h,” 4 consecutive high-load days, and a 72-hour Thursday recovery-floor breach. The Stage 2 Triage callout is visible.
+
+Triage propagation validation: opening Triage directly from the 290-hour Commitment Mirror scenario now shows Recovery Margin -204 hrs and Remaining Deficit 204 hrs before any selection. The list contains only flexible task buttons; the explicit note says recovery blocks are never suggested here.

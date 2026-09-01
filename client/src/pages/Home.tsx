@@ -89,8 +89,11 @@ const initialFixedCommitments: FixedCommitment[] = [
 
 const initialTasks: FlexibleTask[] = [
   { id: 1, name: "Readings for seminar", estimatedHours: 4, cognitiveLoad: "Medium", deadline: "Thu", deferred: false, category: "mental" },
-  { id: 2, name: "Laundry", estimatedHours: 2, cognitiveLoad: "Low", deadline: "Sat", deferred: false, category: "physical" },
-  { id: 3, name: "Society discussion", estimatedHours: 1.5, cognitiveLoad: "Medium", deadline: "Fri", deferred: false, category: "social" },
+  { id: 2, name: "Research synthesis", estimatedHours: 3, cognitiveLoad: "High", deadline: "Thu", deferred: false, category: "mental" },
+  { id: 3, name: "Problem set", estimatedHours: 2.5, cognitiveLoad: "High", deadline: "Thu", deferred: false, category: "mental" },
+  { id: 4, name: "Case study", estimatedHours: 4, cognitiveLoad: "High", deadline: "Thu", deferred: false, category: "mental" },
+  { id: 5, name: "Laundry", estimatedHours: 2, cognitiveLoad: "Low", deadline: "Sat", deferred: false, category: "physical" },
+  { id: 6, name: "Society discussion", estimatedHours: 1.5, cognitiveLoad: "Medium", deadline: "Fri", deferred: false, category: "social" },
 ];
 
 const DEFAULT_RECOVERY_BLOCKS: RecoveryBlock[] = [
@@ -147,6 +150,13 @@ const statusFor = (margin: number) => {
   return { label: "Comfortable", color: "#2D6A4F", soft: "#F3F8F5", copy: "Room remains around your commitments" };
 };
 
+const dailyStatusFor = (margin: number) => {
+  if (margin < 0) return statusFor(-1);
+  if (margin <= 5) return statusFor(5);
+  if (margin <= 10) return statusFor(10);
+  return statusFor(21);
+};
+
 const categoryLabel = (category: TaskCategory) => {
   if (category === "social") return "Social";
   if (category === "physical") return "Physical";
@@ -167,6 +177,8 @@ function App() {
   const [tasks, setTasks] = useState<FlexibleTask[]>(initialTasks);
   const [recoveryBlocks, setRecoveryBlocks] = useState<RecoveryBlock[]>([]);
   const [overrideCount, setOverrideCount] = useState(0);
+  const [triageMarginOverride, setTriageMarginOverride] = useState<number | null>(null);
+  const [triageOutcomeDeficit, setTriageOutcomeDeficit] = useState<number | null>(null);
   const [showQuickCheck, setShowQuickCheck] = useState(false);
   const [quickName, setQuickName] = useState("");
   const [quickHours, setQuickHours] = useState(1);
@@ -221,7 +233,8 @@ function App() {
   const sleepImpact = dailyBreachAmount > 0 ? Math.min(sleepHours, Math.round(dailyBreachAmount * 2) / 2) : 0;
   const triageItems = tasks.filter((task) => !task.deferred); // Tier 3 only; RecoveryBlock records never enter this list.
   const selectedRecovery = triageItems.filter((task) => selectedTriage.includes(task.id)).reduce((sum, task) => sum + task.estimatedHours, 0);
-  const remainingDeficit = Math.max(0, -calculation.margin - selectedRecovery);
+  const triageBaseMargin = triageMarginOverride ?? calculation.margin;
+  const remainingDeficit = triageOutcomeDeficit ?? Math.max(0, -triageBaseMargin - selectedRecovery);
 
   const loadPattern = useMemo(() => {
     const active = tasks.filter((task) => !task.deferred);
@@ -266,9 +279,11 @@ function App() {
     setDraftEstimateTouched(false);
     setDraftName("");
     setDraftHours(1);
-    setScreen(nextOverrideCount >= 3 ? "triage" : "dashboard");
     setTriageOutcome(null);
+    setTriageOutcomeDeficit(null);
+    setTriageMarginOverride(null);
     setSelectedTriage([]);
+    setScreen(nextOverrideCount >= 3 ? "triage" : "dashboard");
   };
 
   const handleAddAnyway = () => {
@@ -307,8 +322,11 @@ function App() {
   const applyTriage = () => {
     if (!selectedTriage.length) return;
     const released = selectedRecovery;
+    const deficitBeforeSelection = Math.max(0, -triageBaseMargin);
+    const deficitAfterSelection = Math.max(0, deficitBeforeSelection - released);
     setTasks((current) => current.map((task) => selectedTriage.includes(task.id) ? { ...task, deferred: true } : task));
-    if (released >= Math.max(0, -calculation.margin)) setTriageOutcome("full");
+    setTriageOutcomeDeficit(deficitAfterSelection);
+    if (deficitAfterSelection === 0) setTriageOutcome("full");
     else if (released > 0) setTriageOutcome("partial");
     else setTriageOutcome("failure");
     setSelectedTriage([]);
@@ -322,8 +340,16 @@ function App() {
 
   const navTo = (next: Screen) => {
     setTriageOutcome(null);
+    setTriageOutcomeDeficit(null);
     setPlannerMessage("");
+    if (next !== "triage") setTriageMarginOverride(null);
     setScreen(next);
+  };
+
+  const openTriage = (margin?: number) => {
+    setTriageMarginOverride(typeof margin === "number" ? margin : null);
+    setTriageOutcomeDeficit(null);
+    navTo("triage");
   };
 
   return (
@@ -365,7 +391,7 @@ function App() {
                   onQuickCheck={openQuickCheck}
                   onPlanner={() => navTo("planner")}
                   onReflection={() => navTo("reflection")}
-                  onTriage={() => navTo("triage")}
+                  onTriage={() => openTriage()}
                   onDeleteTask={(id) => setTasks((current) => current.filter((task) => task.id !== id))}
                 />
               )}
@@ -388,15 +414,16 @@ function App() {
                   setDraftDeadline={setDraftDeadline}
                   setShowActions={setShowActions}
                   onAddAnyway={handleAddAnyway}
-                  onTriage={() => navTo("triage")}
+                  onTriage={() => openTriage(projectedMargin)}
                   onSplit={() => { setDraftHours(Math.max(0.5, Math.round(draftHours / 2 * 10) / 10)); setShowActions(false); }}
                   onFindSlot={() => { setDraftDeadline(DAYS[(lowestDayIndex + 2) % 7]); setShowActions(false); }}
-                  onDefer={() => navTo("triage")}
+                  onDefer={() => openTriage(projectedMargin)}
                 />
               )}
               {screen === "triage" && (
                 <Triage
                   calculation={calculation}
+                  displayMargin={triageBaseMargin}
                   items={triageItems}
                   selectedTriage={selectedTriage}
                   selectedRecovery={selectedRecovery}
@@ -405,7 +432,7 @@ function App() {
                   outcome={triageOutcome}
                   onToggle={(id) => setSelectedTriage((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])}
                   onApply={applyTriage}
-                  onContinue={() => setTriageOutcome(null)}
+                  onContinue={() => { setTriageOutcome(null); setTriageOutcomeDeficit(null); }}
                   onProceed={() => navTo("dashboard")}
                   onPlanner={() => navTo("planner")}
                   onDashboard={() => navTo("dashboard")}
@@ -581,7 +608,7 @@ function Dashboard({ calculation, tasks, onAddTask, onQuickCheck, onPlanner, onR
       </section>
       <aside className="week-side-rail">
         <div className="side-rail-label">The week at a glance</div>
-        <div className="day-dots">{DAYS.map((day, index) => { const dayStatus = statusFor(calculation.dailyMargins[index]); return <div key={day} className="day-dot-item"><span className="day-name">{day}</span><span className="day-dot" style={{ background: dayStatus.color }} title={`${day}: ${dayStatus.label}`} /><span className="day-margin">{formatShortHours(calculation.dailyMargins[index])}</span></div>; })}</div>
+        <div className="day-dots">{DAYS.map((day, index) => { const dayStatus = dailyStatusFor(calculation.dailyMargins[index]); return <div key={day} className="day-dot-item"><span className="day-name">{day}</span><span className="day-dot" style={{ background: dayStatus.color }} title={`${day}: ${dayStatus.label}`} /><span className="day-margin">{formatShortHours(calculation.dailyMargins[index])}</span></div>; })}</div>
         <img src={WEEK_LINES_URL} alt="" className="week-lines" />
         <p className="side-note">Daily dots include your Recovery Floor, fixed load, and deadline-weighted tasks.</p>
       </aside>
@@ -617,9 +644,10 @@ function CommitmentMirror({ draftName, draftHours, draftDeadline, draftSuggestio
 
 function SparkleDot() { return <span className="suggestion-dot"><span /></span>; }
 
-function Triage({ calculation, items, selectedTriage, selectedRecovery, remainingDeficit, overrideCount, outcome, onToggle, onApply, onContinue, onProceed, onPlanner, onDashboard }: { calculation: CalculationShape; items: FlexibleTask[]; selectedTriage: number[]; selectedRecovery: number; remainingDeficit: number; overrideCount: number; outcome: TriageOutcome; onToggle: (id: number) => void; onApply: () => void; onContinue: () => void; onProceed: () => void; onPlanner: () => void; onDashboard: () => void }) {
+function Triage({ calculation, displayMargin, items, selectedTriage, selectedRecovery, remainingDeficit, overrideCount, outcome, onToggle, onApply, onContinue, onProceed, onPlanner, onDashboard }: { calculation: CalculationShape; displayMargin: number; items: FlexibleTask[]; selectedTriage: number[]; selectedRecovery: number; remainingDeficit: number; overrideCount: number; outcome: TriageOutcome; onToggle: (id: number) => void; onApply: () => void; onContinue: () => void; onProceed: () => void; onPlanner: () => void; onDashboard: () => void }) {
+  const displayStatus = statusFor(displayMargin);
   if (outcome === "failure") return <FailureState onProtect={onPlanner} onDashboard={onDashboard} />;
-  return <div className="triage-page"><div className="screen-header"><div><p className="eyebrow">Triage <span>Rebalancing, not task management</span></p><h1 className="page-heading">Recovery deficit detected.</h1><p className="lede compact">Release flexible commitments to restore your Recovery Margin.</p>{overrideCount >= 3 && <p className="override-alert">You've overridden {overrideCount} warnings. Please rebalance before continuing.</p>}</div><div className="triage-margin"><span>Recovery Margin</span><strong style={{ color: calculation.status.color }}>{formatHours(calculation.margin)}</strong></div></div><div className="triage-note"><LockKeyhole size={15} /> Recovery blocks are never suggested here.</div>{outcome === "full" ? <div className="outcome-panel outcome-full"><CircleCheck size={23} /><div><strong>Recovery Margin restored.</strong><p>The selected flexible commitments moved out of this week.</p></div><button className="secondary-button" onClick={onDashboard}>Return to Dashboard</button></div> : outcome === "partial" ? <div className="outcome-panel outcome-partial"><TriangleAlert size={23} /><div><strong>Partial rebalancing applied. {formatHours(remainingDeficit)} deficit remains.</strong><p>Would you like to continue adjusting or proceed with the remaining deficit?</p></div><div className="outcome-actions"><button className="secondary-button" onClick={onContinue}>Continue Adjusting</button><button className="primary-button" onClick={onProceed}>Proceed Anyway</button></div></div> : <><div className="triage-list">{items.length ? items.map((task) => <button key={task.id} className={`triage-item ${selectedTriage.includes(task.id) ? "triage-item-selected" : ""}`} onClick={() => onToggle(task.id)}><span className="triage-check">{selectedTriage.includes(task.id) ? <Check size={17} /> : <Circle size={19} />}</span><span className="triage-item-copy"><strong>{task.name}</strong><small>{formatHours(task.estimatedHours)} → push to {task.deadline === "Sat" ? "Sunday" : "Saturday"}</small></span><span className="triage-gain">+{formatShortHours(task.estimatedHours)}</span></button>) : <div className="empty-state">No flexible commitments are available to release.</div>}</div><div className="triage-total"><div><span>Selected recovery</span><strong>+{formatHours(selectedRecovery)}</strong></div><div><span>Remaining deficit</span><strong className={remainingDeficit === 0 ? "text-green" : ""}>{formatHours(remainingDeficit)}</strong></div></div><button className="primary-button primary-button-wide" disabled={!selectedTriage.length} onClick={onApply}>Apply Selected Rebalancing <ArrowRight size={17} /></button></>}</div>;
+  return <div className="triage-page"><div className="screen-header"><div><p className="eyebrow">Triage <span>Rebalancing, not task management</span></p><h1 className="page-heading">Recovery deficit detected.</h1><p className="lede compact">Release flexible commitments to restore your Recovery Margin.</p>{overrideCount >= 3 && <p className="override-alert">You've overridden {overrideCount} warnings. Please rebalance before continuing.</p>}</div><div className="triage-margin"><span>Recovery Margin</span><strong style={{ color: displayStatus.color }}>{formatHours(displayMargin)}</strong></div></div><div className="triage-note"><LockKeyhole size={15} /> Recovery blocks are never suggested here.</div>{outcome === "full" ? <div className="outcome-panel outcome-full"><CircleCheck size={23} /><div><strong>Recovery Margin restored.</strong><p>The selected flexible commitments moved out of this week.</p></div><button className="secondary-button" onClick={onDashboard}>Return to Dashboard</button></div> : outcome === "partial" ? <div className="outcome-panel outcome-partial"><TriangleAlert size={23} /><div><strong>Partial rebalancing applied. {formatHours(remainingDeficit)} deficit remains.</strong><p>Would you like to continue adjusting or proceed with the remaining deficit?</p></div><div className="outcome-actions"><button className="secondary-button" onClick={onContinue}>Continue Adjusting</button><button className="primary-button" onClick={onProceed}>Proceed Anyway</button></div></div> : <><div className="triage-list">{items.length ? items.map((task) => <button key={task.id} className={`triage-item ${selectedTriage.includes(task.id) ? "triage-item-selected" : ""}`} onClick={() => onToggle(task.id)}><span className="triage-check">{selectedTriage.includes(task.id) ? <Check size={17} /> : <Circle size={19} />}</span><span className="triage-item-copy"><strong>{task.name}</strong><small>{formatHours(task.estimatedHours)} → push to {task.deadline === "Sat" ? "Sunday" : "Saturday"}</small></span><span className="triage-gain">+{formatShortHours(task.estimatedHours)}</span></button>) : <div className="empty-state">No flexible commitments are available to release.</div>}</div><div className="triage-total"><div><span>Selected recovery</span><strong>+{formatHours(selectedRecovery)}</strong></div><div><span>Remaining deficit</span><strong className={remainingDeficit === 0 ? "text-green" : ""}>{formatHours(remainingDeficit)}</strong></div></div><button className="primary-button primary-button-wide" disabled={!selectedTriage.length} onClick={onApply}>Apply Selected Rebalancing <ArrowRight size={17} /></button></>}</div>;
 }
 
 function FailureState({ onProtect, onDashboard }: { onProtect: () => void; onDashboard: () => void }) { return <div className="failure-panel"><div className="failure-mark"><TriangleAlert size={25} /></div><h1>Some recovery loss this week may be unavoidable.</h1><p>Based on your current commitments, there is no flexible combination that restores the full deficit.</p><div className="what-margin"><strong>What Margin can still do:</strong><span>→ Protect your highest-value sleep nights</span><span>→ Flag which days carry most risk</span><span>→ Plan recovery for next week</span></div><div className="outcome-actions"><button className="secondary-button" onClick={onProtect}>Plan Next Week</button><button className="primary-button" onClick={onDashboard}>Protect What's Left</button></div></div>; }
