@@ -85,6 +85,8 @@ const RECOVERY_FIELD_URL = "/manus-storage/margin-recovery-field_e8c101f2.png";
 const initialFixedCommitments: FixedCommitment[] = [
   { id: 1, name: "Seminar", days: ["Tue", "Thu"], startTime: "10:00", endTime: "12:00", hours: 4 },
   { id: 2, name: "Campus shift", days: ["Fri"], startTime: "14:00", endTime: "19:00", hours: 5 },
+  { id: 3, name: "Lectures", days: ["Mon", "Wed"], startTime: "09:00", endTime: "12:00", hours: 6 },
+  { id: 4, name: "Studio lab", days: ["Wed"], startTime: "14:00", endTime: "17:00", hours: 3 },
 ];
 
 const initialTasks: FlexibleTask[] = [
@@ -270,7 +272,7 @@ function App() {
     setScreen("mirror");
   };
 
-  const addTask = () => {
+  const addTask = (isOverride = false) => {
     const name = draftName.trim() || "Untitled commitment";
     const suggestion = suggestionFor(name);
     const task: FlexibleTask = {
@@ -282,7 +284,7 @@ function App() {
       deferred: false,
       category: suggestion.category,
     };
-    const nextOverrideCount = overrideCount + 1;
+    const nextOverrideCount = isOverride ? overrideCount + 1 : overrideCount;
     setTasks((current) => [...current, task]);
     setOverrideCount(nextOverrideCount);
     setConfirmBreach(false);
@@ -293,15 +295,19 @@ function App() {
     setTriageOutcomeDeficit(null);
     setTriageMarginOverride(null);
     setSelectedTriage([]);
-    setScreen(nextOverrideCount >= 3 ? "triage" : "dashboard");
+    setScreen(isOverride && nextOverrideCount >= 3 ? "triage" : "dashboard");
   };
 
+  // A breach is either the weekly capacity running out or any single day the projection pushes negative.
+  const breachesFloor = projectedMargin < 0 || dailyBreachAmount > 0;
+
   const handleAddAnyway = () => {
-    if (projectedMargin < 0 && !showConsequencePreview) {
+    // confirmBreach means the student already came back through "See impact"; don't re-open the preview.
+    if (breachesFloor && !showConsequencePreview && !confirmBreach) {
       setShowConsequencePreview(true);
       return;
     }
-    addTask();
+    addTask(breachesFloor);
   };
 
   const openConsequenceImpact = () => {
@@ -529,7 +535,7 @@ function App() {
             triageCount={triageItems.length}
             consequenceDay={consequenceDay}
             onImpact={openConsequenceImpact}
-            onAddAnyway={() => { setShowConsequencePreview(false); addTask(); }}
+            onAddAnyway={() => { setShowConsequencePreview(false); addTask(true); }}
             onReschedule={rescheduleFromPreview}
           />
         )}
@@ -738,7 +744,7 @@ function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtec
 
 function Reflection({ calculation, overrideCount, recoveryQuality, onNextWeek, onAdjust }: { calculation: CalculationShape; overrideCount: number; recoveryQuality: "Fully" | "Partially" | "Not really" | null; onNextWeek: () => void; onAdjust: () => void }) {
   const hardestIndex = calculation.dailyMargins.reduce((lowest, margin, index, margins) => margin < margins[lowest] ? index : lowest, 0);
-  const maintained = Math.max(0, Math.round(calculation.tier2Total - 56));
+  const maintained = Math.round(calculation.tier2Total);
   return <div className="reflection-page"><div className="screen-header"><div><p className="eyebrow">Weekly reflection <span>06 / 06</span></p><h1 className="page-heading">Week 36 Reflection</h1><p className="date-range">Sept 1 – Sept 7 · A view of what recovery looked like this week.</p></div><div className="reflection-mark"><ShieldCheck size={23} /></div></div><div className="reflection-message"><span className="message-rule" /><p>You protected your recovery this week.<br />That's what sustainable performance looks like.</p></div><div className="reflection-metrics"><MetricCard icon={<Moon size={18} />} label="Recovery Maintained" value={`${maintained} hrs`} mark="✓" tone="blue" /><MetricCard icon={<ShieldCheck size={18} />} label="Recovery Floor Breached" value="0 times" mark="✓" tone="green" /><MetricCard icon={<RotateCcw size={18} />} label="Commitments Rebalanced" value="3" mark="✓" tone="green" /><MetricCard icon={<TriangleAlert size={18} />} label={'Add Anyway Overrides'} value={String(overrideCount)} mark={overrideCount > 2 ? "!" : "—"} tone={overrideCount > 2 ? "amber" : "muted"} /><MetricCard icon={<ShieldCheck size={18} />} label="Recovery Quality" value={recoveryQuality ?? "Pending"} mark={recoveryQuality ? "✓" : "—"} tone={recoveryQuality ? "green" : "muted"} /></div><div className="hardest-day"><div><span className="card-label">The hardest day</span><strong>Your hardest day: {DAYS[hardestIndex]}</strong><p>Next week: Consider protecting {DAYS[hardestIndex]} evening.</p></div><img src={WEEK_LINES_URL} alt="" /></div><div className="ignition-hook"><div><span className="card-label">Week 37 ignition</span><strong>Your hardest day was {DAYS[hardestIndex]}.</strong><p>Consider protecting {DAYS[hardestIndex]} evening before Week 37 begins.</p></div><button className="primary-button" onClick={onNextWeek}>Set Up Week 37 <ArrowRight size={17} /></button></div><div className="reflection-actions"><button className="secondary-button" onClick={onAdjust}><SlidersHorizontal size={17} /> Adjust Recovery Floor</button></div></div>;
 }
 
