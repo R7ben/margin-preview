@@ -36,7 +36,7 @@ import {
   Brain,
 } from "lucide-react";
 
-type Screen = "onboarding" | "dashboard" | "mirror" | "triage" | "planner" | "reflection";
+type Screen = "onboarding" | "dashboard" | "mirror" | "triage" | "planner" | "reflection" | "import";
 type CognitiveLoad = "Low" | "Medium" | "High";
 type TaskCategory = "mental" | "social" | "physical";
 type TriageOutcome = "full" | "partial" | "failure" | null;
@@ -100,6 +100,11 @@ const DEFAULT_RECOVERY_BLOCKS: RecoveryBlock[] = [
   { id: 101, day: "Tuesday", startTime: "18:00", endTime: "19:00", type: "Physical break", locked: false },
   { id: 102, day: "Thursday", startTime: "18:30", endTime: "19:30", type: "Screen-free wind-down", locked: false },
   { id: 103, day: "Sunday", startTime: "10:00", endTime: "11:00", type: "Sleep extension", locked: false },
+];
+
+const IMPORTED_TIMETABLE: FixedCommitment[] = [
+  { id: 901, name: "Design studio", days: ["Mon", "Wed"], startTime: "09:00", endTime: "11:00", hours: 4 },
+  { id: 902, name: "Statistics lab", days: ["Thu"], startTime: "14:00", endTime: "16:00", hours: 2 },
 ];
 
 const suggestionFor = (value: string): Suggestion => {
@@ -180,6 +185,9 @@ function App() {
   const [triageMarginOverride, setTriageMarginOverride] = useState<number | null>(null);
   const [triageOutcomeDeficit, setTriageOutcomeDeficit] = useState<number | null>(null);
   const [showQuickCheck, setShowQuickCheck] = useState(false);
+  const [showConsequencePreview, setShowConsequencePreview] = useState(false);
+  const [importFileName, setImportFileName] = useState("");
+  const [importReviewed, setImportReviewed] = useState(false);
   const [quickName, setQuickName] = useState("");
   const [quickHours, setQuickHours] = useState(1);
   const [draftName, setDraftName] = useState("");
@@ -196,6 +204,8 @@ function App() {
   const [commitmentStart, setCommitmentStart] = useState("09:00");
   const [commitmentEnd, setCommitmentEnd] = useState("11:00");
   const [plannerMessage, setPlannerMessage] = useState("");
+  const [recoveryQuality, setRecoveryQuality] = useState<"Fully" | "Partially" | "Not really" | null>(null);
+  const [recoveryQualityDismissed, setRecoveryQualityDismissed] = useState(false);
 
   const calculation = useMemo(() => {
     const fixedTotal = fixedCommitments.reduce((sum, item) => sum + item.hours, 0);
@@ -287,11 +297,35 @@ function App() {
   };
 
   const handleAddAnyway = () => {
-    if (projectedMargin < 0 && !confirmBreach) {
-      setConfirmBreach(true);
+    if (projectedMargin < 0 && !showConsequencePreview) {
+      setShowConsequencePreview(true);
       return;
     }
     addTask();
+  };
+
+  const openConsequenceImpact = () => {
+    setShowConsequencePreview(false);
+    setConfirmBreach(true);
+    setShowActions(true);
+  };
+
+  const rescheduleFromPreview = () => {
+    setShowConsequencePreview(false);
+    openTriage(projectedMargin);
+  };
+
+  const openImport = () => {
+    setImportFileName("");
+    setImportReviewed(false);
+    setScreen("import");
+  };
+
+  const approveImportedSchedule = () => {
+    setFixedCommitments((current) => [...current, ...IMPORTED_TIMETABLE]);
+    setImportReviewed(false);
+    setImportFileName("");
+    setScreen("onboarding");
   };
 
   const saveCommitment = () => {
@@ -377,8 +411,9 @@ function App() {
             setCommitmentStart={setCommitmentStart}
             setCommitmentEnd={setCommitmentEnd}
             saveCommitment={saveCommitment}
-            onStart={() => navTo("dashboard")}
-          />
+                  onStart={() => navTo("dashboard")}
+                  onImport={openImport}
+                />
         ) : (
           <>
             <Header screen={screen} onBack={() => navTo("dashboard")} />
@@ -389,6 +424,10 @@ function App() {
                   tasks={tasks}
                   onAddTask={() => startMirror()}
                   onQuickCheck={openQuickCheck}
+                  recoveryQualityBlock={recoveryBlocks.find((block) => block.locked) ?? null}
+                  recoveryQuality={recoveryQuality}
+                  recoveryQualityDismissed={recoveryQualityDismissed}
+                  onRecoveryQuality={(quality) => { setRecoveryQuality(quality); setRecoveryQualityDismissed(true); }}
                   onPlanner={() => navTo("planner")}
                   onReflection={() => navTo("reflection")}
                   onTriage={() => openTriage()}
@@ -452,8 +491,19 @@ function App() {
                 <Reflection
                   calculation={calculation}
                   overrideCount={overrideCount}
-                  onNextWeek={() => navTo("dashboard")}
+                  recoveryQuality={recoveryQuality}
+                  onNextWeek={() => navTo("onboarding")}
                   onAdjust={() => navTo("onboarding")}
+                />
+              )}
+              {screen === "import" && (
+                <ImportCommitments
+                  fileName={importFileName}
+                  reviewed={importReviewed}
+                  onFile={(name) => { setImportFileName(name); setImportReviewed(false); }}
+                  onContinue={() => setImportReviewed(true)}
+                  onApprove={approveImportedSchedule}
+                  onManual={() => navTo("onboarding")}
                 />
               )}
             </main>
@@ -473,6 +523,16 @@ function App() {
             onAdd={() => { setShowQuickCheck(false); startMirror(quickName, quickHours); }}
           />
         )}
+        {showConsequencePreview && (
+          <ConsequencePreview
+            projectedMargin={projectedMargin}
+            triageCount={triageItems.length}
+            consequenceDay={consequenceDay}
+            onImpact={openConsequenceImpact}
+            onAddAnyway={() => { setShowConsequencePreview(false); addTask(); }}
+            onReschedule={rescheduleFromPreview}
+          />
+        )}
       </div>
     </div>
   );
@@ -480,11 +540,12 @@ function App() {
 
 function Header({ screen, onBack }: { screen: Screen; onBack: () => void }) {
   const titles: Record<Exclude<Screen, "onboarding">, string> = {
-    dashboard: "Week of Sept 1",
+    dashboard: "Today",
     mirror: "Commitment Mirror",
     triage: "Triage",
     planner: "Recovery Planner",
     reflection: "Week 36 Reflection",
+    import: "Import Schedule",
   };
   return (
     <header className="topbar">
@@ -524,6 +585,7 @@ function Onboarding(props: {
   setCommitmentEnd: (value: string) => void;
   saveCommitment: () => void;
   onStart: () => void;
+  onImport: () => void;
 }) {
   const { sleepHours, decompHours, fixedCommitments, availableCapacity, tier2Total, fixedTotal } = props;
   const capacityStatus = statusFor(availableCapacity);
@@ -572,7 +634,7 @@ function Onboarding(props: {
                   <div className="grid grid-cols-2 gap-3"><label className="field-label">Start time<input type="time" className="text-input" value={props.commitmentStart} onChange={(event) => props.setCommitmentStart(event.target.value)} /></label><label className="field-label">End time<input type="time" className="text-input" value={props.commitmentEnd} onChange={(event) => props.setCommitmentEnd(event.target.value)} /></label></div>
                   <div className="form-actions"><button className="secondary-button" onClick={() => props.setShowCommitmentForm(false)}>Cancel</button><button className="primary-button" onClick={props.saveCommitment}>Save commitment</button></div>
                 </div>
-              ) : <button className="text-action" onClick={() => props.setShowCommitmentForm(true)}><Plus size={16} /> Add Commitment</button>}
+              ) : <div className="setup-actions"><button className="text-action" onClick={() => props.setShowCommitmentForm(true)}><Plus size={16} /> Add Commitment</button><button className="text-action" onClick={props.onImport}><CalendarDays size={16} /> Import Schedule</button></div>}
             </section>
           </div>
           <aside className="capacity-panel">
@@ -593,11 +655,12 @@ function RangeCard({ icon, label, value, note, min, max, step, inputValue, onCha
   return <div className="range-card"><div className="range-card-head"><div className="range-icon">{icon}</div><div><span className="range-label">{label}</span><p>{note}</p></div><strong>{value}</strong></div><input aria-label={label} type="range" min={min} max={max} step={step} value={inputValue} onChange={(event) => onChange(Number(event.target.value))} /></div>;
 }
 
-function Dashboard({ calculation, tasks, onAddTask, onQuickCheck, onPlanner, onReflection, onTriage, onDeleteTask }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; onAddTask: () => void; onQuickCheck: () => void; onPlanner: () => void; onReflection: () => void; onTriage: () => void; onDeleteTask: (id: number) => void }) {
+function Dashboard({ calculation, tasks, onAddTask, onQuickCheck, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, onTriage, onDeleteTask }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; onAddTask: () => void; onQuickCheck: () => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; onTriage: () => void; onDeleteTask: (id: number) => void }) {
   const status = calculation.status;
   const scale = Math.max(calculation.availableCapacity, calculation.flexTotal + Math.max(calculation.margin, 0), 1);
   return <div className="dashboard-page">
-    <div className="dashboard-intro"><div><p className="eyebrow">Portfolio dashboard <span>Week 36</span></p><h1 className="page-heading">Your week, with recovery in view.</h1></div><button className="quiet-button" onClick={onReflection}><BarChart3 size={16} /> Weekly Reflection</button></div>
+    {recoveryQualityBlock && !recoveryQualityDismissed && <RecoveryQualityCard block={recoveryQualityBlock} onSelect={onRecoveryQuality} />}
+    <div className="dashboard-intro"><div><p className="eyebrow">Today <span>Week 36</span></p><h1 className="page-heading">Your week, with recovery in view.</h1></div><button className="quiet-button" onClick={onReflection}><BarChart3 size={16} /> Weekly Reflection</button></div>
     <div className="dashboard-grid">
       <section className="hero-margin-card" style={{ background: status.soft }}>
         <div className="hero-card-head"><div><span className="card-label">Recovery Margin</span><p className="card-subtitle">What remains after recovery, fixed load, and flexible tasks.</p></div><div className="status-pill" style={{ color: status.color, borderColor: `${status.color}44`, background: `${status.color}10` }}><span className="status-dot" style={{ background: status.color }} />{status.label}</div></div>
@@ -642,6 +705,18 @@ function CommitmentMirror({ draftName, draftHours, draftDeadline, draftSuggestio
   </div>;
 }
 
+function ConsequencePreview({ projectedMargin, triageCount, consequenceDay, onImpact, onAddAnyway, onReschedule }: { projectedMargin: number; triageCount: number; consequenceDay: string; onImpact: () => void; onAddAnyway: () => void; onReschedule: () => void }) {
+  return <div className="sheet-backdrop consequence-backdrop" role="dialog" aria-modal="true" aria-labelledby="consequence-preview-title"><div className="consequence-modal"><div className="modal-kicker"><TriangleAlert size={17} /> Consequence Preview</div><h2 id="consequence-preview-title">This addition changes the shape of your week.</h2><p className="modal-lede">Adding this drops your margin to <strong>{formatHours(projectedMargin)}</strong> and puts <strong>{triageCount} flexible commitments</strong> into Triage territory.</p><div className="modal-consequence"><Moon size={19} /><span><strong>{consequenceDay} is the pressure point.</strong><small>See the full recovery and high-load impact before confirming.</small></span></div><div className="modal-actions"><button className="secondary-button" onClick={onImpact}>See impact</button><button className="primary-button" onClick={onAddAnyway}>Add anyway</button><button className="text-button" onClick={onReschedule}>Reschedule</button></div><p className="modal-note"><ShieldCheck size={14} /> Add anyway remains available. Your choice is recorded in Weekly Reflection.</p></div></div>;
+}
+
+function RecoveryQualityCard({ block, onSelect }: { block: RecoveryBlock; onSelect: (quality: "Fully" | "Partially" | "Not really") => void }) {
+  return <section className="recovery-quality-card" aria-labelledby="quality-title"><div className="quality-kicker"><ShieldCheck size={16} /> Recovery quality check-in</div><h2 id="quality-title">{block.type} yesterday ({block.startTime}–{block.endTime})</h2><p>Did it restore you?</p><div className="quality-actions"><button onClick={() => onSelect("Fully")}>Fully</button><button onClick={() => onSelect("Partially")}>Partially</button><button onClick={() => onSelect("Not really")}>Not really</button></div></section>;
+}
+
+function ImportCommitments({ fileName, reviewed, onFile, onContinue, onApprove, onManual }: { fileName: string; reviewed: boolean; onFile: (name: string) => void; onContinue: () => void; onApprove: () => void; onManual: () => void }) {
+  return <div className="import-page"><div className="screen-header"><div><p className="eyebrow">Fixed commitments <span>02 / 06</span></p><h1 className="page-heading">Import Schedule</h1><p className="lede compact">Bring in the things that cannot move. Margin will keep them ahead of tasks.</p></div><CalendarDays size={28} className="screen-mark" /></div>{reviewed ? <section className="import-review panel-section"><div className="section-kicker"><span className="section-number">02</span><span>Confirm fixed load</span><span className="section-line" /></div><div className="import-file-chip"><Check size={16} /> {fileName || "Sample university timetable"}</div><p className="import-note">These classes will be added as Fixed Load before you approve them.</p><div className="import-class-list">{IMPORTED_TIMETABLE.map((item) => <div className="commitment-row" key={item.id}><div><strong>{item.name}</strong><span>{item.days.join(" · ")} · {item.startTime}–{item.endTime}</span></div><span className="hours-chip">{formatShortHours(item.hours)}</span></div>)}</div><div className="form-actions"><button className="secondary-button" onClick={() => onFile("")}>Choose another file</button><button className="primary-button" onClick={onApprove}>Approve Fixed Load <ArrowRight size={17} /></button></div></section> : <section className="import-options panel-section"><div className="section-kicker"><span className="section-number">01</span><span>Choose a source</span><span className="section-line" /></div><label className="import-option"><input type="radio" checked={!fileName} readOnly /><span><strong>Upload university timetable</strong><small>PDF, CSV, or image · parsed locally for this prototype</small></span><input className="file-input" type="file" accept=".pdf,.csv,image/*" onChange={(event) => onFile(event.target.files?.[0]?.name ?? "")} /></label><div className="import-option import-option-disabled"><input type="radio" checked={false} readOnly /><span><strong>Import calendar</strong><small>Future build · OAuth and parsing are not enabled here.</small></span><span className="future-label">Future build</span></div><div className="import-sample"><button className="text-action" onClick={() => onFile("Sample university timetable.pdf")}><BookOpen size={16} /> Use sample timetable for preview</button><span>{fileName || "No timetable selected yet"}</span></div><div className="form-actions"><button className="secondary-button" onClick={onManual}>Enter manually instead</button><button className="primary-button" onClick={onContinue}>Continue <ArrowRight size={17} /></button></div><p className="feasibility-note">Parsing and OAuth are finalist-phase builds. Manual entry remains the MVP fallback.</p></section>}</div>;
+}
+
 function SparkleDot() { return <span className="suggestion-dot"><span /></span>; }
 
 function Triage({ calculation, displayMargin, items, selectedTriage, selectedRecovery, remainingDeficit, overrideCount, outcome, onToggle, onApply, onContinue, onProceed, onPlanner, onDashboard }: { calculation: CalculationShape; displayMargin: number; items: FlexibleTask[]; selectedTriage: number[]; selectedRecovery: number; remainingDeficit: number; overrideCount: number; outcome: TriageOutcome; onToggle: (id: number) => void; onApply: () => void; onContinue: () => void; onProceed: () => void; onPlanner: () => void; onDashboard: () => void }) {
@@ -661,10 +736,10 @@ function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtec
   return <div className="planner-page"><div className="screen-header"><div><p className="eyebrow">Recovery Planner <span>05 / 06</span></p><h1 className="page-heading">Schedule recovery before tasks fill the week.</h1></div><div className="load-pattern-pill"><span className="status-dot status-dot-blue" /> Load pattern: {loadPattern.label}</div></div><div className="recommendation-panel"><div className="recommendation-icon"><Leaf size={22} /></div><div><span className="card-label">Based on this week's load</span><strong>{loadPattern.recommendation}</strong><p>Every suggestion references a specific opening in your current schedule.</p></div></div><p className="planner-intro">Scheduled before your remaining tasks. Obligations fill what's left.</p><div className="suggested-blocks">{blocks.map((block) => <div className={`planner-block ${block.locked ? "planner-block-locked" : ""}`} key={block.id}><div className="planner-block-top"><span className="planner-day">{block.day}</span><span className="planner-time">{block.startTime} – {block.endTime}</span>{block.locked && <span className="locked-label"><LockKeyhole size={13} /> Protected</span>}</div><strong>{block.type}</strong><small>After 2 consecutive high-load days</small><div className="planner-block-actions">{block.locked ? <span className="locked-copy"><ShieldCheck size={15} /> Tier 2 immediately</span> : <><button className="secondary-button" onClick={() => onProtect(block.id)}>Protect</button><button className="text-button">Edit</button></>}</div></div>)}</div>{plannerMessage && <div className="planner-message"><Check size={16} /> {plannerMessage}</div>}<div className="planner-actions"><button className="primary-button" onClick={onLockAll}><LockKeyhole size={17} /> Lock All Suggested Blocks</button><button className="secondary-button" onClick={onSkip}>Skip for Now</button></div></div>;
 }
 
-function Reflection({ calculation, overrideCount, onNextWeek, onAdjust }: { calculation: CalculationShape; overrideCount: number; onNextWeek: () => void; onAdjust: () => void }) {
+function Reflection({ calculation, overrideCount, recoveryQuality, onNextWeek, onAdjust }: { calculation: CalculationShape; overrideCount: number; recoveryQuality: "Fully" | "Partially" | "Not really" | null; onNextWeek: () => void; onAdjust: () => void }) {
   const hardestIndex = calculation.dailyMargins.reduce((lowest, margin, index, margins) => margin < margins[lowest] ? index : lowest, 0);
   const maintained = Math.max(0, Math.round(calculation.tier2Total - 56));
-  return <div className="reflection-page"><div className="screen-header"><div><p className="eyebrow">Weekly reflection <span>06 / 06</span></p><h1 className="page-heading">Week 36 Reflection</h1><p className="date-range">Sept 1 – Sept 7 · A view of what recovery looked like this week.</p></div><div className="reflection-mark"><ShieldCheck size={23} /></div></div><div className="reflection-message"><span className="message-rule" /><p>You protected your recovery this week.<br />That's what sustainable performance looks like.</p></div><div className="reflection-metrics"><MetricCard icon={<Moon size={18} />} label="Recovery Maintained" value={`${maintained} hrs`} mark="✓" tone="blue" /><MetricCard icon={<ShieldCheck size={18} />} label="Recovery Floor Breached" value="0 times" mark="✓" tone="green" /><MetricCard icon={<RotateCcw size={18} />} label="Commitments Rebalanced" value="3" mark="✓" tone="green" /><MetricCard icon={<TriangleAlert size={18} />} label={'"Add Anyway" Overrides'} value={String(overrideCount)} mark={overrideCount > 2 ? "!" : "—"} tone={overrideCount > 2 ? "amber" : "muted"} /></div><div className="hardest-day"><div><span className="card-label">The hardest day</span><strong>Your hardest day: {DAYS[hardestIndex]}</strong><p>Next week: Consider protecting {DAYS[hardestIndex]} evening.</p></div><img src={WEEK_LINES_URL} alt="" /></div><div className="reflection-actions"><button className="primary-button" onClick={onNextWeek}>View Next Week <ArrowRight size={17} /></button><button className="secondary-button" onClick={onAdjust}><SlidersHorizontal size={17} /> Adjust Recovery Floor</button></div></div>;
+  return <div className="reflection-page"><div className="screen-header"><div><p className="eyebrow">Weekly reflection <span>06 / 06</span></p><h1 className="page-heading">Week 36 Reflection</h1><p className="date-range">Sept 1 – Sept 7 · A view of what recovery looked like this week.</p></div><div className="reflection-mark"><ShieldCheck size={23} /></div></div><div className="reflection-message"><span className="message-rule" /><p>You protected your recovery this week.<br />That's what sustainable performance looks like.</p></div><div className="reflection-metrics"><MetricCard icon={<Moon size={18} />} label="Recovery Maintained" value={`${maintained} hrs`} mark="✓" tone="blue" /><MetricCard icon={<ShieldCheck size={18} />} label="Recovery Floor Breached" value="0 times" mark="✓" tone="green" /><MetricCard icon={<RotateCcw size={18} />} label="Commitments Rebalanced" value="3" mark="✓" tone="green" /><MetricCard icon={<TriangleAlert size={18} />} label={'Add Anyway Overrides'} value={String(overrideCount)} mark={overrideCount > 2 ? "!" : "—"} tone={overrideCount > 2 ? "amber" : "muted"} /><MetricCard icon={<ShieldCheck size={18} />} label="Recovery Quality" value={recoveryQuality ?? "Pending"} mark={recoveryQuality ? "✓" : "—"} tone={recoveryQuality ? "green" : "muted"} /></div><div className="hardest-day"><div><span className="card-label">The hardest day</span><strong>Your hardest day: {DAYS[hardestIndex]}</strong><p>Next week: Consider protecting {DAYS[hardestIndex]} evening.</p></div><img src={WEEK_LINES_URL} alt="" /></div><div className="ignition-hook"><div><span className="card-label">Week 37 ignition</span><strong>Your hardest day was {DAYS[hardestIndex]}.</strong><p>Consider protecting {DAYS[hardestIndex]} evening before Week 37 begins.</p></div><button className="primary-button" onClick={onNextWeek}>Set Up Week 37 <ArrowRight size={17} /></button></div><div className="reflection-actions"><button className="secondary-button" onClick={onAdjust}><SlidersHorizontal size={17} /> Adjust Recovery Floor</button></div></div>;
 }
 
 function MetricCard({ icon, label, value, mark, tone }: { icon: ReactNode; label: string; value: string; mark: string; tone: "blue" | "green" | "amber" | "muted" }) { return <div className={`metric-card metric-${tone}`}><div className="metric-label">{icon}<span>{label}</span></div><div className="metric-value">{value}<span>{mark}</span></div></div>; }
@@ -676,6 +751,6 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, setName,
   return <div className="sheet-backdrop" role="dialog" aria-modal="true"><div className="quick-sheet"><div className="sheet-handle" /><div className="sheet-head"><div><p className="eyebrow">Quick Check <span>Read-only simulation</span></p><h2>Can I afford this?</h2><p>Simulate any commitment before you say yes.</p></div><button className="icon-button" aria-label="Close quick check" onClick={onClose}><X size={19} /></button></div><div className="quick-form"><label className="field-label">What are you being asked to do?<input className="text-input" placeholder="e.g. Finish a lab report" value={name} onChange={(event) => setName(event.target.value)} /></label><label className="field-label">How long will it take?<div className="input-with-unit"><input className="text-input" type="number" min="0.5" step="0.5" value={hours} onChange={(event) => setHours(Number(event.target.value))} /><span>hrs</span></div></label></div><div className="quick-result"><span className="card-label">Recovery Margin after this commitment</span><strong style={{ color: status.color }}>{formatHours(calculation.margin)} <ArrowRight size={16} /> {formatHours(projected)}</strong><span className="quick-status" style={{ color: status.color }}><span className="status-dot" style={{ background: status.color }} /> {status.label} · {suggestion.cognitiveLoad} load</span>{showSleep && <small><Moon size={14} /> Sleep impact may land on the tightest day.</small>}</div><div className="sheet-actions"><button className="secondary-button" onClick={onClose}>Close</button><button className="primary-button" onClick={onAdd}>Add to Schedule <ArrowRight size={16} /></button></div><p className="sheet-note"><Info size={14} /> Quick Check does not change your schedule.</p></div></div>;
 }
 
-function BottomNav({ screen, onNavigate }: { screen: Screen; onNavigate: (screen: Screen) => void }) { const items: { screen: Screen; label: string; icon: ReactNode }[] = [{ screen: "dashboard", label: "Dashboard", icon: <Grid2X2 size={18} /> }, { screen: "mirror", label: "Add Task", icon: <Plus size={19} /> }, { screen: "planner", label: "Planner", icon: <Leaf size={18} /> }, { screen: "reflection", label: "Reflection", icon: <BarChart3 size={18} /> }]; return <nav className="bottom-nav" aria-label="Primary"><div className="bottom-nav-inner">{items.map((item) => <button key={item.screen} className={`nav-item ${screen === item.screen ? "nav-item-active" : ""}`} onClick={() => onNavigate(item.screen)}>{item.icon}<span>{item.label}</span></button>)}</div></nav>; }
+function BottomNav({ screen, onNavigate }: { screen: Screen; onNavigate: (screen: Screen) => void }) { const items: { screen: Screen; label: string; icon: ReactNode }[] = [{ screen: "dashboard", label: "Today", icon: <Grid2X2 size={18} /> }, { screen: "mirror", label: "Add Task", icon: <Plus size={19} /> }, { screen: "planner", label: "Planner", icon: <Leaf size={18} /> }, { screen: "reflection", label: "Reflection", icon: <BarChart3 size={18} /> }]; return <nav className="bottom-nav" aria-label="Primary"><div className="bottom-nav-inner">{items.map((item) => <button key={item.screen} className={`nav-item ${screen === item.screen ? "nav-item-active" : ""}`} onClick={() => onNavigate(item.screen)}>{item.icon}<span>{item.label}</span></button>)}</div></nav>; }
 
 export default App;

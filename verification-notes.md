@@ -37,3 +37,21 @@ The loaded dashboard exposes six active flexible commitments, including four men
 Commitment Mirror demo validation: with the loaded Thursday week, a 4-hour “lab report” shows “Thu sleep 7h → 6.5h” even though weekly margin remains comfortable at 82 hrs. The 290-hour version shows -204 hrs after accepting, “Thu sleep 7h → 0h,” 4 consecutive high-load days, and a 72-hour Thursday recovery-floor breach. The Stage 2 Triage callout is visible.
 
 Triage propagation validation: opening Triage directly from the 290-hour Commitment Mirror scenario now shows Recovery Margin -204 hrs and Remaining Deficit 204 hrs before any selection. The list contains only flexible task buttons; the explicit note says recovery blocks are never suggested here.
+
+The Recovery Floor Setup now exposes Import Schedule beside Add Commitment, with the existing 103 hrs setup calculation unchanged.
+
+Import Schedule verification: the new screen shows Upload university timetable, Import calendar labelled Future build, a sample timetable preview option, manual-entry fallback, and the explicit parsing/OAuth feasibility note. The flow is visually consistent with the existing Soft Minimalism instrument language.
+
+Import Schedule confirmation validation: selecting the sample timetable and continuing shows extracted classes Design studio (Mon/Wed, 09:00–11:00, 4h) and Statistics lab (Thu, 14:00–16:00, 2h) with an explicit Approve Fixed Load action.
+
+Approval validation: the imported Design studio and Statistics lab are appended to Fixed commitments and Available Capacity updates from 103 hrs to 97 hrs, confirming the flow has a visible state-changing approval step.
+
+After approving the sample timetable, Recovery Floor Setup shows both imported classes and the recalculated 97 hrs Available Capacity. The new flow returns to the existing setup screen rather than implying automatic calendar sync.
+
+New-feature verification: the dashboard now presents as Today, and the loaded demo remains visible with six active flex tasks. The Add Task action is reachable at the bottom of Today for the pre-confirmation Consequence Preview test.
+
+Consequence Preview setup validation: a 290-hour task on the loaded week surfaces Thu sleep 7h → 0h, 4 consecutive high-load days, and a 74-hour Thu recovery-floor breach before confirmation. The detailed state remains visible above the action area.
+
+Consequence Preview verification: selecting Add Anyway opens a modal with projected margin, pressure-point day, See impact, Add anyway, and Reschedule actions. Confirming Add anyway returns to Today with the task added, Breached status, -210 hrs margin, and the recovery deficit callout.
+
+Final visual verification: desktop onboarding cleanly exposes Import Schedule beside Add Commitment; mobile 375px keeps the new entry point, capacity card, and Start Planning CTA readable and usable. Weekly Reflection shows the Week 37 Ignition hook, and the overloaded Commitment Mirror flow shows the Consequence Preview modal before confirmation.
