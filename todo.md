@@ -11,3 +11,11 @@
 - [x] Add docs/terminology.md with the frozen terminology table.
 - [x] Add docs/non_goals.md with the exact frozen non-goals list.
 - [x] Verify responsive rendering, interactions, terminology, and production build.
+
+## Integration and verification expansion
+
+- [ ] Add real timetable parsing for supported PDF, CSV, and image inputs with honest parse-error handling.
+- [ ] Add calendar OAuth integration scaffolding and a clear disabled/unconfigured state when credentials are absent.
+- [ ] Add automated regression tests for Consequence Preview and Import Schedule approval.
+- [ ] Add expandable per-day load details behind Today’s margin dots.
+- [ ] Run integration, regression, responsive, and production checks.
