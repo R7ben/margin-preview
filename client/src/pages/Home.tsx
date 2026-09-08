@@ -4,7 +4,7 @@
  * deep ocean frames the interface, blue marks protected recovery infrastructure, and the four state colors
  * communicate actual Recovery Margin changes. Keep whitespace generous, language observational, and agency intact.
  */
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -255,7 +255,6 @@ function App() {
   const [taskOutcomes, setTaskOutcomes] = useState<TaskOutcomeRecord[]>([]);
   const [energyCheckIn, setEnergyCheckIn] = useState<EnergyCheckIn | null>(null);
 
-  const todayIndex = (new Date().getDay() + 6) % 7;
   const todayKey = new Date().toDateString();
 
   const calculation = useMemo(() => {
@@ -297,7 +296,7 @@ function App() {
   const triageBaseMargin = triageMarginOverride ?? calculation.margin;
   const remainingDeficit = triageOutcomeDeficit ?? Math.max(0, -triageBaseMargin - selectedRecovery);
   const deferCandidate = triageItems.length ? triageItems.reduce((best, task) => (task.estimatedHours > best.estimatedHours ? task : best), triageItems[0]) : null;
-  const showEnergyCheckIn = calculation.dailyMargins[todayIndex] < 5 && (!energyCheckIn || energyCheckIn.date !== todayKey);
+  const showEnergyCheckIn = Math.min(...calculation.dailyMargins) < 5 && (!energyCheckIn || energyCheckIn.date !== todayKey);
 
   const loadPattern = useMemo(() => {
     const active = tasks.filter((task) => !task.deferred);
@@ -357,6 +356,10 @@ function App() {
   const recordTaskOutcome = (task: FlexibleTask, outcome: TaskOutcomeValue) => {
     setTaskOutcomes((current) => [...current, { taskId: task.id, taskName: task.name, outcome, timestamp: Date.now() }]);
     setTasks((current) => current.filter((item) => item.id !== task.id));
+  };
+
+  const deleteTaskSilently = (id: number) => {
+    setTasks((current) => current.filter((item) => item.id !== id));
   };
 
   const respondEnergyCheckIn = (response: EnergyResponse) => {
@@ -521,6 +524,7 @@ function App() {
                   onReflection={() => navTo("reflection")}
                   onTriage={() => openTriage()}
                   onRecordOutcome={recordTaskOutcome}
+                  onDeleteTaskSilently={deleteTaskSilently}
                   onEnergyRespond={respondEnergyCheckIn}
                 />
               )}
@@ -749,9 +753,20 @@ function RangeCard({ icon, label, value, note, min, max, step, inputValue, onCha
   return <div className="range-card"><div className="range-card-head"><div className="range-icon">{icon}</div><div><span className="range-label">{label}</span><p>{note}</p></div><strong>{value}</strong></div><input aria-label={label} type="range" min={min} max={max} step={step} value={inputValue} onChange={(event) => onChange(Number(event.target.value))} /></div>;
 }
 
-function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, onAddTask, onQuickCheck, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, onTriage, onRecordOutcome, onEnergyRespond }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; recoveryBlocks: RecoveryBlock[]; showEnergyCheckIn: boolean; onAddTask: () => void; onQuickCheck: () => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; onTriage: () => void; onRecordOutcome: (task: FlexibleTask, outcome: TaskOutcomeValue) => void; onEnergyRespond: (response: EnergyResponse) => void }) {
+function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, onAddTask, onQuickCheck, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, onTriage, onRecordOutcome, onDeleteTaskSilently, onEnergyRespond }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; recoveryBlocks: RecoveryBlock[]; showEnergyCheckIn: boolean; onAddTask: () => void; onQuickCheck: () => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; onTriage: () => void; onRecordOutcome: (task: FlexibleTask, outcome: TaskOutcomeValue) => void; onDeleteTaskSilently: (id: number) => void; onEnergyRespond: (response: EnergyResponse) => void }) {
   const [showFullWeek, setShowFullWeek] = useState(false);
   const [pendingOutcomeId, setPendingOutcomeId] = useState<number | null>(null);
+  const pendingOutcomeIdRef = useRef<number | null>(null);
+  useEffect(() => { pendingOutcomeIdRef.current = pendingOutcomeId; }, [pendingOutcomeId]);
+  const requestDelete = (id: number) => {
+    setPendingOutcomeId(id);
+    setTimeout(() => {
+      if (pendingOutcomeIdRef.current === id) {
+        onDeleteTaskSilently(id);
+        setPendingOutcomeId(null);
+      }
+    }, 5000);
+  };
   const status = calculation.status;
   const scale = Math.max(calculation.availableCapacity, calculation.flexTotal + Math.max(calculation.margin, 0), 1);
   const lowestDayIndex = calculation.dailyMargins.reduce((lowest, margin, index, margins) => (margin < margins[lowest] ? index : lowest), 0);
@@ -767,7 +782,7 @@ function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, onAd
   const renderTaskRow = (task: FlexibleTask, tag?: string) => {
     const Icon = categoryIcon(task.category);
     if (pendingOutcomeId === task.id) return <div className="task-row" key={task.id}><div className="outcome-feedback-row"><span>{task.name} — how did it go?</span><div className="outcome-emoji-group">{outcomeEmojis.map((item) => <button key={item.value} className="outcome-emoji-button" aria-label={item.value} onClick={() => { onRecordOutcome(task, item.value); setPendingOutcomeId(null); }}>{item.icon}</button>)}</div></div></div>;
-    return <div className="task-row" key={task.id}><div className="task-leading">{tag && <span className="lock-in-tag">{tag}</span>}<div className={`task-icon task-icon-${task.category}`}><Icon size={15} /></div><div><strong>{task.name}</strong><span>{formatHours(task.estimatedHours)} · {categoryLabel(task.category)} load · due {task.deadline}</span></div></div><button className="icon-button" aria-label={`Delete ${task.name}`} onClick={() => setPendingOutcomeId(task.id)}><Trash2 size={16} /></button></div>;
+    return <div className="task-row" key={task.id}><div className="task-leading">{tag && <span className="lock-in-tag">{tag}</span>}<div className={`task-icon task-icon-${task.category}`}><Icon size={15} /></div><div><strong>{task.name}</strong><span>{formatHours(task.estimatedHours)} · {categoryLabel(task.category)} load · due {task.deadline}</span></div></div><button className="icon-button" aria-label={`Delete ${task.name}`} onClick={() => requestDelete(task.id)}><Trash2 size={16} /></button></div>;
   };
   return <div className="dashboard-page">
     {recoveryQualityBlock && !recoveryQualityDismissed && <RecoveryQualityCard block={recoveryQualityBlock} onSelect={onRecoveryQuality} />}
