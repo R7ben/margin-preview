@@ -81,6 +81,7 @@ type Suggestion = {
 };
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const RING_CIRCUMFERENCE = 2 * Math.PI * 86;
 const MARK_URL = "/manus-storage/margin-mark_0f2827e1.png";
 const PAPER_URL = "/manus-storage/margin-paper-grain_ce180b60.png";
 const WEEK_LINES_URL = "/manus-storage/margin-week-lines_ab52177b.png";
@@ -782,18 +783,27 @@ function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, onAd
   const renderTaskRow = (task: FlexibleTask, tag?: string) => {
     const Icon = categoryIcon(task.category);
     if (pendingOutcomeId === task.id) return <div className="task-row" key={task.id}><div className="outcome-feedback-row"><span>{task.name} — how did it go?</span><div className="outcome-emoji-group">{outcomeEmojis.map((item) => <button key={item.value} className="outcome-emoji-button" aria-label={item.value} onClick={() => { onRecordOutcome(task, item.value); setPendingOutcomeId(null); }}>{item.icon}</button>)}</div></div></div>;
-    return <div className="task-row" key={task.id}><div className="task-leading">{tag && <span className="lock-in-tag">{tag}</span>}<div className={`task-icon task-icon-${task.category}`}><Icon size={15} /></div><div><strong>{task.name}</strong><span>{formatHours(task.estimatedHours)} · {categoryLabel(task.category)} load · due {task.deadline}</span></div></div><button className="icon-button" aria-label={`Delete ${task.name}`} onClick={() => requestDelete(task.id)}><Trash2 size={16} /></button></div>;
+    return <div className="task-row" key={task.id}><div className="task-leading">{tag && <span className={`lock-in-tag lock-in-tag-${tag.toLowerCase().replace(/[^a-z]/g, "")}`}>{tag}</span>}<div className={`task-icon task-icon-${task.category}`}><Icon size={15} /></div><div><strong>{task.name}</strong><span>{formatHours(task.estimatedHours)} · {categoryLabel(task.category)} load · due {task.deadline}</span></div></div><button className="icon-button" aria-label={`Delete ${task.name}`} onClick={() => requestDelete(task.id)}><Trash2 size={16} /></button></div>;
   };
   return <div className="dashboard-page">
     {recoveryQualityBlock && !recoveryQualityDismissed && <RecoveryQualityCard block={recoveryQualityBlock} onSelect={onRecoveryQuality} />}
     {showEnergyCheckIn && <section className="energy-checkin-card"><span className="card-label">Heading into today...</span><div className="energy-checkin-actions"><button className="secondary-button" onClick={() => onEnergyRespond("Rough")}>😮‍💨 Rough</button><button className="secondary-button" onClick={() => onEnergyRespond("Okay")}>😐 Okay</button><button className="secondary-button" onClick={() => onEnergyRespond("Ready")}>💪 Ready</button></div></section>}
     <div className="dashboard-intro"><div><p className="eyebrow">Today <span>Week 36</span></p><h1 className="page-heading">Your week, with recovery in view.</h1></div><button className="quiet-button" onClick={onReflection}><BarChart3 size={16} /> Weekly Reflection</button></div>
     <div className="dashboard-grid">
-      <section className="hero-margin-card" style={{ background: status.soft }}>
-        <div className="hero-card-head"><div><span className="card-label">Recovery Margin</span><p className="card-subtitle">{headline}</p></div><div className="status-pill" style={{ color: status.color, borderColor: `${status.color}44`, background: `${status.color}10` }}><span className="status-dot" style={{ background: status.color }} />{status.label}</div></div>
-        <div className="margin-number" style={{ color: status.color }}>{formatHours(calculation.margin)}</div>
-        {showRiskLine && <p className="margin-risk-line">Your week has room. {lowestDay} doesn't.</p>}
-        <div className="margin-footer"><span>{status.copy}</span><span className="trend-copy"><span className="trend-arrow">{calculation.flexTotal > 0 ? "↓" : "→"}</span> {calculation.flexTotal > 0 ? "Shrinking" : "Holding"} <small>{calculation.flexTotal > 0 ? `was ${formatHours(calculation.margin + calculation.flexTotal)} before flexible commitments` : "no flexible commitments are using the margin"}</small></span></div>
+      <section className="hero-margin-card">
+        <div className="hero-card-head"><span className="card-label">Recovery Margin</span><div className="status-pill" style={{ color: status.color, borderColor: `${status.color}44`, background: `${status.color}10` }}><span className="status-dot" style={{ background: status.color }} />{status.label}</div></div>
+        <div className="progress-ring-wrap">
+          <svg className="progress-ring-svg" viewBox="0 0 200 200">
+            <circle className="progress-ring-track" cx="100" cy="100" r="86" />
+            <circle className="progress-ring-fill" cx="100" cy="100" r="86" style={{ stroke: status.color, strokeDasharray: RING_CIRCUMFERENCE, strokeDashoffset: RING_CIRCUMFERENCE * (1 - Math.max(0, Math.min(1, calculation.margin / scale))) }} />
+          </svg>
+          <div className="progress-ring-center">
+            <div className="margin-number" style={{ color: status.color }}>{formatHours(calculation.margin)}</div>
+            <span className="trend-copy"><span className="trend-arrow">{calculation.flexTotal > 0 ? "↓" : "→"}</span> {calculation.flexTotal > 0 ? "Shrinking" : "Holding"}</span>
+          </div>
+        </div>
+        <p className="hero-substat">{headline}{showRiskLine ? ` Your week has room. ${lowestDay} doesn't.` : ""}</p>
+        <div className="margin-footer"><span>{status.copy}</span><span className="trend-copy"><small>{calculation.flexTotal > 0 ? `was ${formatHours(calculation.margin + calculation.flexTotal)} before flexible commitments` : "no flexible commitments are using the margin"}</small></span></div>
         {calculation.distributionWarning && <div className="distribution-warning"><TriangleAlert size={16} /> Recovery concentrated later in the week</div>}
         {calculation.margin <= 0 && <button className="triage-callout" onClick={onTriage}><TriangleAlert size={17} /> Recovery deficit detected <ArrowRight size={16} /></button>}
       </section>
@@ -810,17 +820,17 @@ function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, onAd
         <div className="task-list">
           {mustDo ? renderTaskRow(mustDo, "Must-do") : <div className="empty-state"><FileText size={19} /><span>No must-do task right now.</span></div>}
           {maintenance ? renderTaskRow(maintenance, "Maintenance") : <div className="empty-state"><FileText size={19} /><span>No maintenance task right now.</span></div>}
-          {nextBlock ? <div className="task-row"><div className="task-leading"><span className="lock-in-tag">Recovery</span><div className="task-icon task-icon-recovery"><LockKeyhole size={15} /></div><div><strong>{nextBlock.type}</strong><span>{nextBlock.day} · {nextBlock.startTime}–{nextBlock.endTime}</span></div></div></div> : <div className="task-row"><div className="task-leading"><span className="lock-in-tag">Recovery</span><div className="task-icon task-icon-recovery"><LockKeyhole size={15} /></div><div><strong>No recovery block locked yet</strong><span>Protect one before the week fills up.</span></div></div><button className="text-action" onClick={onPlanner}>Open planner</button></div>}
+          {nextBlock ? <div className="task-row"><div className="task-leading"><span className="lock-in-tag lock-in-tag-recovery">Recovery</span><div className="task-icon task-icon-recovery"><LockKeyhole size={15} /></div><div><strong>{nextBlock.type}</strong><span>{nextBlock.day} · {nextBlock.startTime}–{nextBlock.endTime}</span></div></div></div> : <div className="task-row"><div className="task-leading"><span className="lock-in-tag lock-in-tag-recovery">Recovery</span><div className="task-icon task-icon-recovery"><LockKeyhole size={15} /></div><div><strong>No recovery block locked yet</strong><span>Protect one before the week fills up.</span></div></div><button className="text-action" onClick={onPlanner}>Open planner</button></div>}
         </div>
       </section>
     ) : (
       <>
-        <section className="load-panel"><div className="load-panel-head"><div><span className="card-label">How the week is allocated</span><p className="card-subtitle">Recovery stays first. Obligations use what remains.</p></div><button className="text-action" onClick={onPlanner}><Leaf size={16} /> Open planner</button></div><div className="stacked-bars">{[
-          { label: "Recovery Floor", value: calculation.tier2Total, color: "#2196A6", icon: <LockKeyhole size={14} /> },
-          { label: "Fixed Load", value: calculation.fixedTotal, color: "#1B4965", icon: <CalendarCheck2 size={14} /> },
-          { label: "Flex Tasks", value: calculation.flexTotal, color: "#F4A261", icon: <FileText size={14} /> },
-          { label: "Recovery Margin", value: Math.max(calculation.margin, 0), color: status.color, icon: <ShieldCheck size={14} /> },
-        ].map((item) => <div className="stack-row" key={item.label}><div className="stack-meta"><span className="stack-label">{item.icon}{item.label}</span><strong>{formatHours(item.value)}</strong></div><div className="stack-track"><div className="stack-fill" style={{ width: `${Math.min(100, Math.max(4, item.value / scale * 100))}%`, background: item.color }} /></div></div>)}</div></section>
+        <section className="load-panel"><div className="load-panel-head"><div><span className="card-label">How the week is allocated</span><p className="card-subtitle">Recovery stays first. Obligations use what remains.</p></div><button className="text-action" onClick={onPlanner}><Leaf size={16} /> Open planner</button></div><div className="telemetry-grid">{[
+          { label: "Recovery Floor", value: calculation.tier2Total, good: true },
+          { label: "Fixed Load", value: calculation.fixedTotal, good: calculation.fixedTotal <= calculation.availableCapacity },
+          { label: "Flex Tasks", value: calculation.flexTotal, good: calculation.flexTotal <= calculation.margin + calculation.flexTotal },
+          { label: "Recovery Margin", value: Math.max(calculation.margin, 0), good: calculation.margin >= 5 },
+        ].map((item) => <div className="telemetry-card" key={item.label}><span className="telemetry-label">{item.label} {item.good && <CircleCheck size={12} />}</span><strong className="telemetry-value">{formatHours(item.value)}</strong></div>)}</div></section>
         <section className="tasks-panel"><div className="tasks-head"><div><span className="card-label">Flexible commitments</span><p className="card-subtitle">These compete for the margin. They can be deferred in Triage.</p></div><span className="task-count">{activeTasks.length} active</span></div>{activeTasks.length ? <div className="task-list">{activeTasks.map((task) => renderTaskRow(task))}</div> : <div className="empty-state"><FileText size={19} /><span>No flexible tasks yet. Add one to see its cost.</span></div>}<button className="text-action" onClick={() => setShowFullWeek(false)}>← Back to Lock In</button></section>
       </>
     )}
