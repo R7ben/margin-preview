@@ -205,22 +205,6 @@ const nextRecoveryBlock = (blocks: RecoveryBlock[]) => {
   return locked.reduce((soonest, block) => (dayIndex(block) < dayIndex(soonest) ? block : soonest), locked[0]);
 };
 
-// Client only handles copy generation here; the margin math above remains the source of truth.
-const fetchAiSentence = async (prompt: string) => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
-  if (!apiKey) throw new Error("Missing Gemini API key");
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
-  if (!response.ok) throw new Error("Gemini request failed");
-  const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("Empty Gemini response");
-  return String(text).trim();
-};
-
 function App() {
   const [screen, setScreen] = useState<Screen>("onboarding");
   const [sleepHours, setSleepHours] = useState(7);
@@ -910,22 +894,70 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, energyCh
   const showSleep = projected < 0;
   const lowestDayIndex = calculation.dailyMargins.reduce((lowest, margin, index, margins) => (margin < margins[lowest] ? index : lowest), 0);
   const consequenceDay = DAYS[lowestDayIndex];
-  const [aiSentence, setAiSentence] = useState<string | null>(null);
+  const [aiSentence, setAiSentence] = useState<string>("");
   const [aiLoading, setAiLoading] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
+
+  const fetchAiSentence = async (
+    taskName: string,
+    taskHours: number,
+    currentMargin: number,
+    projectedMargin: number,
+    statusLabel: string,
+    pressuredDay: string,
+  ) => {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+    if (!apiKey) return;
+
     setAiLoading(true);
+    setAiSentence("");
+
+    const prompt = `You are Margin, a calm recovery-first student planner.
+A student used "Can I afford this?" to simulate a commitment.
+Current recovery margin: ${currentMargin} hrs
+Projected margin after task: ${projectedMargin} hrs
+Status: ${statusLabel}
+Most pressured day this week: ${pressuredDay}
+Task name: ${taskName}
+Estimated hours: ${taskHours}
+
+Write ONE sentence only. Be calm, specific, and honest.
+Start with "You". No preamble. No quotes around the sentence.
+If margin is comfortable, reassure but flag the risk day.
+If margin is tightening, suggest splitting or starting earlier.
+If margin is critical or breached, clearly say this week is too full.`;
+
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 80, temperature: 0.7 },
+        }),
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) setAiSentence(String(text).trim());
+    } catch {
+      setAiSentence("");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!name.trim() || hours <= 0) {
+      setAiSentence("");
+      setAiLoading(false);
+      return;
+    }
     const timer = setTimeout(() => {
-      const energyContext = energyCheckIn ? ` The student checked in feeling "${energyCheckIn.response}" today.` : "";
-      const prompt = `In one short, warm sentence (max 20 words), tell a student whether adding "${name || "this commitment"}" (${hours} hrs) to their week is safe. Their recovery margin would go from ${formatHours(calculation.margin)} to ${formatHours(projected)}, which is ${status.label.toLowerCase()}, with the tightest day being ${consequenceDay}.${energyContext} Do not use exclamation marks. No preamble, just the sentence.`;
-      fetchAiSentence(prompt)
-        .then((text) => { if (!cancelled) setAiSentence(text); })
-        .catch(() => { if (!cancelled) setAiSentence(null); })
-        .finally(() => { if (!cancelled) setAiLoading(false); });
+      fetchAiSentence(name, hours, calculation.margin, projected, status.label, consequenceDay);
     }, 700);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [name, hours, calculation.margin, projected, status.label, consequenceDay, energyCheckIn]);
-  return <div className="sheet-backdrop" role="dialog" aria-modal="true"><div className="quick-sheet"><div className="sheet-handle" /><div className="sheet-head"><div><p className="eyebrow">Quick Check <span>Read-only simulation</span></p><h2>Can I afford this?</h2><p>Simulate any commitment before you say yes.</p></div><button className="icon-button" aria-label="Close quick check" onClick={onClose}><X size={19} /></button></div><div className="quick-form"><label className="field-label">What are you being asked to do?<input className="text-input" placeholder="e.g. Finish a lab report" value={name} onChange={(event) => setName(event.target.value)} /></label><label className="field-label">How long will it take?<div className="input-with-unit"><input className="text-input" type="number" min="0.5" step="0.5" value={hours} onChange={(event) => setHours(Number(event.target.value))} /><span>hrs</span></div></label></div><div className="quick-result"><span className="card-label">Recovery Margin after this commitment</span><strong style={{ color: status.color }}>{formatHours(calculation.margin)} <ArrowRight size={16} /> {formatHours(projected)}</strong><span className="quick-status" style={{ color: status.color }}><span className="status-dot" style={{ background: status.color }} /> {status.label} · {suggestion.cognitiveLoad} load</span>{aiLoading ? <p className="ai-sentence" style={{ opacity: 0.6 }}>Checking your week...</p> : <p className="ai-sentence">{aiSentence ?? status.copy}</p>}{showSleep && <small><Moon size={14} /> Sleep impact may land on the tightest day.</small>}</div><div className="sheet-actions"><button className="secondary-button" onClick={onClose}>Close</button><button className="primary-button" onClick={onAdd}>Add to Schedule <ArrowRight size={16} /></button></div><p className="sheet-note"><Info size={14} /> Quick Check does not change your schedule.</p></div></div>;
+    return () => clearTimeout(timer);
+  }, [name, hours]);
+  return <div className="sheet-backdrop" role="dialog" aria-modal="true"><div className="quick-sheet"><div className="sheet-handle" /><div className="sheet-head"><div><p className="eyebrow">Quick Check <span>Read-only simulation</span></p><h2>Can I afford this?</h2><p>Simulate any commitment before you say yes.</p></div><button className="icon-button" aria-label="Close quick check" onClick={onClose}><X size={19} /></button></div><div className="quick-form"><label className="field-label">What are you being asked to do?<input className="text-input" placeholder="e.g. Finish a lab report" value={name} onChange={(event) => setName(event.target.value)} /></label><label className="field-label">How long will it take?<div className="input-with-unit"><input className="text-input" type="number" min="0.5" step="0.5" value={hours} onChange={(event) => setHours(Number(event.target.value))} /><span>hrs</span></div></label></div><div className="quick-result"><span className="card-label">Recovery Margin after this commitment</span><strong style={{ color: status.color }}>{formatHours(calculation.margin)} <ArrowRight size={16} /> {formatHours(projected)}</strong><span className="quick-status" style={{ color: status.color }}><span className="status-dot" style={{ background: status.color }} /> {status.label} · {suggestion.cognitiveLoad} load</span><p className="ai-sentence">{status.copy}</p>{aiLoading && <p className="ai-sentence" style={{ opacity: 0.6 }}>Checking your week...</p>}{!aiLoading && aiSentence && <p className="ai-sentence ai-sentence-generated">{aiSentence}</p>}{showSleep && <small><Moon size={14} /> Sleep impact may land on the tightest day.</small>}</div><div className="sheet-actions"><button className="secondary-button" onClick={onClose}>Close</button><button className="primary-button" onClick={onAdd}>Add to Schedule <ArrowRight size={16} /></button></div><p className="sheet-note"><Info size={14} /> Quick Check does not change your schedule.</p></div></div>;
 }
 
 function BottomNav({ screen, onNavigate }: { screen: Screen; onNavigate: (screen: Screen) => void }) { const items: { screen: Screen; label: string; icon: ReactNode }[] = [{ screen: "dashboard", label: "Today", icon: <Grid2X2 size={18} /> }, { screen: "mirror", label: "Add Task", icon: <Plus size={19} /> }, { screen: "planner", label: "Planner", icon: <Leaf size={18} /> }, { screen: "reflection", label: "Reflection", icon: <BarChart3 size={18} /> }]; return <nav className="bottom-nav" aria-label="Primary"><div className="bottom-nav-inner">{items.map((item) => <button key={item.screen} className={`nav-item ${screen === item.screen ? "nav-item-active" : ""}`} onClick={() => onNavigate(item.screen)}>{item.icon}<span>{item.label}</span></button>)}</div></nav>; }
