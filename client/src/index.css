@@ -249,7 +249,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .morning-checkin-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 .ai-sentence { margin: 8px 0 0; color: #6b6b6b; font-size: 12px; line-height: 1.4; }
 .dashboard-actions, .planner-actions, .reflection-actions { display: flex; gap: 10px; margin-top: 20px; }
-.quick-check-fab { position: fixed; right: max(20px, calc((100vw - 1900px) / 2)); top: 1306px; display: inline-flex; min-height: 48px; align-items: center; gap: 9px; padding: 0 15px; color: white; border-radius: 30px; background: #1b4965; box-shadow: 0 9px 22px rgba(27,73,101,.24); font-size: 12px; font-weight: 600; z-index: 20; transition: transform 180ms ease-out, background 180ms ease-out; }
+.quick-check-fab { position: fixed; right: max(20px, calc((100vw - 2000px) / 2)); top: 1306px; display: inline-flex; min-height: 48px; align-items: center; gap: 9px; padding: 0 15px; color: white; border-radius: 30px; background: #1b4965; box-shadow: 0 9px 22px rgba(27,73,101,.24); font-size: 12px; font-weight: 600; z-index: 20; transition: transform 180ms ease-out, background 180ms ease-out; }
 .quick-check-fab:hover { background: #123b54; transform: translateY(-2px); }
 .quick-check-fab:active { transform: scale(.97); }
 
