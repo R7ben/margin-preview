@@ -784,6 +784,7 @@ function App() {
             onAddAnywayOverride={addAnywayOverrideFromPreview}
           />
         )}
+        {screen !== "onboarding" && screen !== "import" && screen !== "triage" && <BottomTabBar active={screen} onNavigate={navTo} />}
       </div>
       <NavDrawer open={drawerOpen} activeScreen={screen} onNavigate={(next) => { navTo(next); setDrawerOpen(false); }} onClose={() => setDrawerOpen(false)} />
     </div>
@@ -798,6 +799,32 @@ const NAV_ITEMS: { id: Screen; label: string; icon: ReactNode; sub?: boolean }[]
   { id: "reflection", label: "Weekly Reflection", icon: <BarChart3 size={18} /> },
   { id: "import", label: "Import Schedule", icon: <Upload size={18} /> },
 ];
+
+const BOTTOM_TAB_ICONS: Record<string, ReactNode> = {
+  Home: <Home size={20} />,
+  Plus: <Plus size={20} />,
+  Leaf: <Leaf size={20} />,
+  BarChart2: <BarChart3 size={20} />,
+};
+
+function BottomTabBar({ active, onNavigate }: { active: Screen; onNavigate: (s: Screen) => void }) {
+  const tabs = [
+    { screen: "dashboard", label: "Today", icon: "Home" },
+    { screen: "mirror", label: "Add Task", icon: "Plus" },
+    { screen: "planner", label: "Planner", icon: "Leaf" },
+    { screen: "reflection", label: "Reflect", icon: "BarChart2" },
+  ] as const;
+  return (
+    <nav className="bottom-tab-bar">
+      {tabs.map((t) => (
+        <button key={t.screen} className={`bottom-tab ${active === t.screen ? "bottom-tab-active" : ""}`} onClick={() => onNavigate(t.screen)}>
+          {BOTTOM_TAB_ICONS[t.icon]}
+          <span className="bottom-tab-label">{t.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
 
 function NavDrawer({ open, activeScreen, onNavigate, onClose }: { open: boolean; activeScreen: Screen; onNavigate: (screen: Screen) => void; onClose: () => void }) {
   if (!open) return null;
