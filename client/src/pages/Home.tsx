@@ -65,6 +65,17 @@ type FixedCommitment = {
   hours: number;
 };
 
+type VisionCommitment = {
+  id: number;
+  name: string;
+  days: string[];
+  timeRange: string;
+  startTime: string;
+  endTime: string;
+  durationHours: number;
+  category: TaskCategory;
+};
+
 type FlexibleTask = {
   id: number;
   name: string;
@@ -130,6 +141,92 @@ const IMPORTED_TIMETABLE: FixedCommitment[] = [
   { id: 901, name: "Design studio", days: ["Mon", "Wed"], startTime: "09:00", endTime: "11:00", hours: 4 },
   { id: 902, name: "Statistics lab", days: ["Thu"], startTime: "14:00", endTime: "16:00", hours: 2 },
 ];
+
+const VISION_TIMETABLE_PROMPT = `Extract all scheduled commitments from this timetable image. For each commitment, return:
+- Name (e.g. "Seminar", "Gym", "Lecture")
+- Day(s) of week (Monday, Tuesday, etc.)
+- Time range (e.g. "10:00-12:00" or "9am-12pm")
+- Duration in hours (calculate from time range)
+- Category guess based on name: Mental, Physical, Social, or Errands
+
+Return ONLY a JSON array with no preamble:
+[
+  {
+    "name": "Seminar",
+    "days": ["Monday", "Wednesday"],
+    "timeRange": "10:00-12:00",
+    "durationHours": 2,
+    "category": "Mental"
+  }
+]
+
+If you can't read the timetable or extract commitments, return an empty array [].`;
+
+const normalizeVisionDay = (value: unknown) => {
+  const text = String(value ?? "").trim().toLowerCase();
+  return DAYS.find((day) => day.toLowerCase().startsWith(text.slice(0, 3))) ?? null;
+};
+
+const normalizeVisionCategory = (value: unknown): TaskCategory => {
+  const text = String(value ?? "").trim().toLowerCase();
+  if (text.includes("physical")) return "physical";
+  if (text.includes("social")) return "social";
+  if (text.includes("errand")) return "errands";
+  return "mental";
+};
+
+const parseVisionTime = (value: unknown) => {
+  const raw = String(value ?? "").trim().toLowerCase().replace(/\./g, "");
+  const match = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+  if (!match) return null;
+  let hour = Number(match[1]);
+  const minutes = Number(match[2] ?? 0);
+  if (minutes > 59) return null;
+  if (match[3] === "pm" && hour < 12) hour += 12;
+  if (match[3] === "am" && hour === 12) hour = 0;
+  if (hour > 23) return null;
+  return `${String(hour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
+const parseVisionTimeRange = (value: unknown) => {
+  const parts = String(value ?? "").replace(/[–—]/g, "-").split(/\s*-\s*/);
+  if (parts.length !== 2) return null;
+  const startTime = parseVisionTime(parts[0]);
+  const endTime = parseVisionTime(parts[1]);
+  if (!startTime || !endTime) return null;
+  return { startTime, endTime };
+};
+
+const parseVisionCommitments = (rawText: string): VisionCommitment[] => {
+  const cleaned = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const start = cleaned.indexOf("[");
+  const end = cleaned.lastIndexOf("]");
+  if (start < 0 || end < start) return [];
+  const parsed = JSON.parse(cleaned.slice(start, end + 1));
+  if (!Array.isArray(parsed)) return [];
+  return parsed.flatMap((item, index) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const name = String(record.name ?? "").trim();
+    const days = Array.isArray(record.days) ? Array.from(new Set(record.days.map(normalizeVisionDay).filter((day): day is string => Boolean(day)))) : [];
+    const range = parseVisionTimeRange(record.timeRange);
+    if (!name || !days.length || !range) return [];
+    const parsedDuration = Number(record.durationHours);
+    const durationHours = Number((Number.isFinite(parsedDuration) && parsedDuration > 0 ? parsedDuration : durationBetween(range.startTime, range.endTime)).toFixed(1));
+    return [{ id: Date.now() + index, name, days, timeRange: `${range.startTime}–${range.endTime}`, startTime: range.startTime, endTime: range.endTime, durationHours, category: normalizeVisionCategory(record.category) }];
+  });
+};
+
+const visionFromFixedCommitment = (item: FixedCommitment): VisionCommitment => ({
+  id: item.id,
+  name: item.name,
+  days: item.days,
+  timeRange: `${item.startTime}–${item.endTime}`,
+  startTime: item.startTime,
+  endTime: item.endTime,
+  durationHours: Number((item.hours / Math.max(1, item.days.length)).toFixed(1)),
+  category: normalizeVisionCategory(item.name),
+});
 
 const suggestionFor = (value: string): Suggestion => {
   const name = value.toLowerCase();
@@ -342,7 +439,10 @@ function App() {
   const [showQuickCheck, setShowQuickCheck] = useState(false);
   const [showConsequencePreview, setShowConsequencePreview] = useState(false);
   const [importFileName, setImportFileName] = useState("");
-  const [importReviewed, setImportReviewed] = useState(false);
+  const [importExtracted, setImportExtracted] = useState<VisionCommitment[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [editingImportId, setEditingImportId] = useState<number | null>(null);
   const [quickName, setQuickName] = useState("");
   const [quickHours, setQuickHours] = useState(1);
   const [draftName, setDraftName] = useState("");
@@ -539,13 +639,70 @@ function App() {
 
   const openImport = () => {
     setImportFileName("");
-    setImportReviewed(false);
+    setImportExtracted([]);
+    setImportLoading(false);
+    setImportError("");
+    setEditingImportId(null);
     setScreen("import");
   };
 
-  const approveImportedSchedule = () => {
-    setFixedCommitments((current) => [...current, ...IMPORTED_TIMETABLE]);
-    setImportReviewed(false);
+  const handleVisionFile = async (file: File | undefined) => {
+    if (!file) return;
+    setImportFileName(file.name);
+    setImportExtracted([]);
+    setImportError("");
+    setImportLoading(true);
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+      if (!apiKey) throw new Error("missing API key");
+      const base64ImageData = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = String(reader.result ?? "");
+          const commaIndex = result.indexOf(",");
+          if (commaIndex < 0) reject(new Error("read failed"));
+          else resolve(result.slice(commaIndex + 1));
+        };
+        reader.onerror = () => reject(new Error("read failed"));
+        reader.readAsDataURL(file);
+      });
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: VISION_TIMETABLE_PROMPT }, { inlineData: { mimeType: file.type || "image/jpeg", data: base64ImageData } }] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.1, maxOutputTokens: 1200 },
+        }),
+      });
+      if (!response.ok) throw new Error("vision failed");
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error("empty response");
+      const extracted = parseVisionCommitments(String(text));
+      if (!extracted.length) {
+        setImportError("No commitments found — try a different image or enter manually");
+      } else {
+        setImportExtracted(extracted);
+      }
+    } catch (error) {
+      setImportError(error instanceof Error && error.message === "read failed" ? "Couldn't read image — try a clearer photo" : "Vision scan failed — enter manually");
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const approveImportedSchedule = (commitments: VisionCommitment[]) => {
+    const fixed = commitments.map((item, index) => ({
+      id: Date.now() + index,
+      name: item.name,
+      days: item.days,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      hours: Number((item.durationHours * item.days.length).toFixed(1)),
+    }));
+    setFixedCommitments((current) => [...current, ...fixed]);
+    setImportExtracted([]);
+    setImportError("");
     setImportFileName("");
     setScreen("onboarding");
   };
@@ -731,10 +888,13 @@ function App() {
               {screen === "import" && (
                 <ImportCommitments
                   fileName={importFileName}
-                  reviewed={importReviewed}
-                  onFile={(name) => { setImportFileName(name); setImportReviewed(false); }}
-                  onContinue={() => setImportReviewed(true)}
-                  onApprove={approveImportedSchedule}
+                  items={importExtracted}
+                  loading={importLoading}
+                  error={importError}
+                  onFile={handleVisionFile}
+                  onCalendar={() => { setImportFileName("Sample university timetable.pdf"); setImportExtracted(IMPORTED_TIMETABLE.map(visionFromFixedCommitment)); setImportError(""); }}
+                  onUpdate={(id: number, updates: Partial<Pick<VisionCommitment, "name" | "days" | "startTime" | "endTime" | "durationHours">>) => setImportExtracted((current) => current.map((item) => item.id === id ? { ...item, ...updates, timeRange: `${updates.startTime ?? item.startTime}–${updates.endTime ?? item.endTime}` } : item))}
+                  onApprove={() => approveImportedSchedule(importExtracted)}
                   onManual={() => navTo("onboarding")}
                 />
               )}
@@ -1139,32 +1299,58 @@ function RecoveryQualityCard({ block, onSelect }: { block: RecoveryBlock; onSele
   return <section className="recovery-quality-card" aria-labelledby="quality-title"><div className="quality-kicker"><ShieldCheck size={16} /> Recovery quality check-in</div><h2 id="quality-title">{block.type} yesterday ({block.startTime}–{block.endTime})</h2><p>Did it restore you?</p><div className="quality-actions"><button onClick={() => onSelect("Fully")}>Fully</button><button onClick={() => onSelect("Partially")}>Partially</button><button onClick={() => onSelect("Not really")}>Not really</button></div></section>;
 }
 
-function ImportCommitments({ fileName, reviewed, onFile, onContinue, onApprove, onManual }: { fileName: string; reviewed: boolean; onFile: (name: string) => void; onContinue: () => void; onApprove: () => void; onManual: () => void }) {
+function ImportCommitments({ fileName, items, loading, error, onFile, onCalendar, onUpdate, onApprove, onManual }: { fileName: string; items: VisionCommitment[]; loading: boolean; error: string; onFile: (file: File | undefined) => void; onCalendar: () => void; onUpdate: (id: number, updates: Partial<Pick<VisionCommitment, "name" | "days" | "startTime" | "endTime" | "durationHours">>) => void; onApprove: () => void; onManual: () => void }) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const editingItem = items.find((item) => item.id === editingId) ?? null;
+  const [editDraft, setEditDraft] = useState({ name: "", days: [] as string[], startTime: "09:00", endTime: "10:00", durationHours: 1 });
+
+  useEffect(() => {
+    if (!editingItem) return;
+    setEditDraft({ name: editingItem.name, days: editingItem.days, startTime: editingItem.startTime, endTime: editingItem.endTime, durationHours: editingItem.durationHours });
+  }, [editingItem]);
+
+  const openFilePicker = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
+  };
+
+  const saveEdit = () => {
+    if (!editingItem || !editDraft.name.trim() || !editDraft.days.length || editDraft.durationHours <= 0) return;
+    onUpdate(editingItem.id, { ...editDraft, name: editDraft.name.trim(), durationHours: Number(editDraft.durationHours.toFixed(1)) });
+    setEditingId(null);
+  };
+
   return <div className="import-page">
-    <div className="screen-title-block"><h1>Import Schedule</h1></div>
-    {reviewed ? (
-      <section className="card import-card">
-        <div className="section-kicker"><CalendarDays size={14} /><span>Confirm fixed load</span></div>
-        <div className="import-file-chip"><Check size={16} /> {fileName || "Sample university timetable"}</div>
-        <p className="import-note">These classes will be added as Fixed Load before you approve them.</p>
-        <div className="import-class-list">{IMPORTED_TIMETABLE.map((item) => <div className="commitment-row" key={item.id}><div><strong>{item.name}</strong><span>{item.days.join(" · ")} · {item.startTime}–{item.endTime}</span></div><span className="hours-chip">{formatShortHours(item.hours)}</span></div>)}</div>
-        <button className="secondary-button import-back-button" onClick={() => onFile("")}>Choose another file</button>
+    <div className="screen-title-block"><h1>Import Schedule</h1><p>Scan a timetable photo, review what Margin found, then approve it as Fixed Load.</p></div>
+    <input ref={fileInputRef} className="file-input" style={{ display: "none" }} type="file" accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp" onChange={(event) => onFile(event.target.files?.[0])} />
+    {loading ? (
+      <section className="card import-card import-scan-card" aria-live="polite"><Spinner className="import-scan-spinner" /><strong>Scanning your timetable...</strong><p className="import-note">Reading names, days, times, and likely categories from the image.</p></section>
+    ) : items.length ? (
+      <section className="card import-card import-review-card">
+        <div className="section-kicker"><Check size={14} /><span>Extracted from your timetable</span></div>
+        <div className="import-file-chip"><Check size={16} /> {fileName}</div>
+        <p className="import-note">Tap Edit on any item before adding these commitments to Fix Commitments.</p>
+        <div className="import-review-list">{items.map((item) => <div className="import-review-item" key={item.id}>
+          <button className="import-review-main" onClick={() => setEditingId(item.id)}><span className="import-review-check"><Check size={14} /></span><span><strong>{item.name}</strong><small>{item.days.join(" · ")} · {item.timeRange} · {formatShortHours(item.durationHours)} each day</small></span></button>
+          <div className="import-review-actions"><span className="import-category-chip">{categoryLabel(item.category)}</span><button className="text-button import-edit-button" onClick={() => setEditingId(item.id)}><PenLine size={14} /> Edit</button></div>
+        </div>)}</div>
+        <div className="import-review-actions import-review-footer"><button className="secondary-button" onClick={openFilePicker}><RotateCcw size={15} /> Scan again</button><button className="primary-button" onClick={onApprove}>Continue <ArrowRight size={17} /></button></div>
       </section>
     ) : (
       <section className="card import-card">
         <div className="section-kicker"><Upload size={14} /><span>Choose a source</span></div>
         <div className="import-source-group">
           <span className="import-source-label"><Upload size={14} /> Upload timetable</span>
-          <label className="import-source-button">
-            <Upload size={15} /> Upload Timetable
-            <input className="file-input" type="file" accept=".pdf,.csv,image/*" onChange={(event) => onFile(event.target.files?.[0]?.name ?? "")} />
-          </label>
-          <span className="import-source-caption">PDF, CSV, or image</span>
+          <button className="import-source-button" onClick={openFilePicker}><Upload size={15} /> Upload Timetable</button>
+          <span className="import-source-caption">JPG, PNG, GIF, or WebP image</span>
         </div>
         <div className="import-divider"><span>OR</span></div>
         <div className="import-source-group">
           <span className="import-source-label"><CalendarCheck2 size={14} /> Import calendar</span>
-          <button className="import-source-button" onClick={() => onFile("Sample university timetable.pdf")}><CalendarCheck2 size={15} /> Import Calendar</button>
+          <button className="import-source-button" onClick={onCalendar}><CalendarCheck2 size={15} /> Import Calendar</button>
           <span className="import-source-caption">Import from Google Calendar</span>
         </div>
         <div className="import-divider"><span>OR</span></div>
@@ -1175,7 +1361,15 @@ function ImportCommitments({ fileName, reviewed, onFile, onContinue, onApprove, 
         {fileName && <div className="import-file-chip"><Check size={16} /> {fileName}</div>}
       </section>
     )}
-    <button className="primary-button" onClick={reviewed ? onApprove : onContinue}>{reviewed ? "Approve Fixed Load" : "Continue"} <ArrowRight size={17} /></button>
+    {error && items.length === 0 && !loading && <p className="import-error import-error-note" role="alert"><TriangleAlert size={15} /> {error}</p>}
+    {editingItem && <div className="sheet-backdrop import-edit-backdrop" role="dialog" aria-modal="true" aria-labelledby="edit-import-title"><div className="import-edit-modal">
+      <div className="sheet-head"><div><p className="eyebrow">Timetable item</p><h2 id="edit-import-title">Edit commitment</h2></div><button className="icon-button" aria-label="Close edit commitment" onClick={() => setEditingId(null)}><X size={19} /></button></div>
+      <label className="field-label">Name<input className="text-input" value={editDraft.name} onChange={(event) => setEditDraft((current) => ({ ...current, name: event.target.value }))} /></label>
+      <div className="import-edit-field"><span className="field-label">Days</span><div className="day-picker">{DAYS.map((day) => <button type="button" key={day} className={`day-toggle ${editDraft.days.includes(day) ? "day-toggle-active" : ""}`} onClick={() => setEditDraft((current) => ({ ...current, days: current.days.includes(day) ? current.days.filter((item) => item !== day) : [...current.days, day] }))}>{day}</button>)}</div></div>
+      <div className="grid grid-cols-2 gap-3"><label className="field-label">Start time<input type="time" className="text-input" value={editDraft.startTime} onChange={(event) => setEditDraft((current) => ({ ...current, startTime: event.target.value }))} /></label><label className="field-label">End time<input type="time" className="text-input" value={editDraft.endTime} onChange={(event) => setEditDraft((current) => ({ ...current, endTime: event.target.value }))} /></label></div>
+      <label className="field-label">Duration per day<input type="number" min="0.5" step="0.5" className="text-input" value={editDraft.durationHours} onChange={(event) => setEditDraft((current) => ({ ...current, durationHours: Number(event.target.value) }))} /></label>
+      <div className="modal-actions"><button className="secondary-button" onClick={() => setEditingId(null)}>Cancel</button><button className="primary-button" disabled={!editDraft.name.trim() || !editDraft.days.length || editDraft.durationHours <= 0} onClick={saveEdit}>Save changes</button></div>
+    </div></div>}
   </div>;
 }
 

@@ -534,3 +534,34 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
   .modal-actions { align-items: stretch; flex-direction: column; }
   .modal-actions .primary-button, .modal-actions .secondary-button, .modal-actions .text-button { width: 100%; }
 }
+
+/* Vision timetable import: calm review rail, editable before approval, never hide the source state. */
+.import-scan-card { align-items: center; justify-content: center; min-height: 180px; padding: 28px 22px; text-align: center; }
+.import-scan-card strong { margin-top: 12px; color: #1B2230; font-size: 15px; }
+.import-scan-spinner { width: 26px; height: 26px; color: var(--teal); }
+.import-review-card { gap: 8px; }
+.import-review-list { margin-top: 10px; border-top: 1px solid #E4E0EC; }
+.import-review-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 0; border-bottom: 1px solid #E4E0EC; }
+.import-review-main { display: flex; min-width: 0; align-items: flex-start; gap: 9px; padding: 0; color: #1B2230; background: transparent; text-align: left; }
+.import-review-main > span:last-child { min-width: 0; }
+.import-review-main strong { display: block; overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.import-review-main small { display: block; margin-top: 4px; color: #6E7280; font-size: 11px; line-height: 1.45; }
+.import-review-check { display: inline-flex; width: 22px; height: 22px; flex: 0 0 auto; align-items: center; justify-content: center; color: #1F8A82; border-radius: 50%; background: #E1F1EE; }
+.import-review-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; }
+.import-review-footer { justify-content: flex-end; margin-top: 14px; }
+.import-edit-button { display: inline-flex; align-items: center; gap: 4px; padding: 4px 0; }
+.import-category-chip { padding: 5px 8px; color: #1F8A82; border: 1px solid #BFE0DB; border-radius: 12px; background: #F3FAF8; font-size: 10px; font-weight: 650; }
+.import-error { display: flex; align-items: flex-start; gap: 7px; margin-top: 13px; padding: 11px 12px; color: #8B3E32; border: 1px solid rgba(209,79,62,.24); border-radius: 10px; background: #FFF4F1; font-size: 12px; line-height: 1.45; }
+.import-error svg { flex: 0 0 auto; margin-top: 1px; color: #D14F3E; }
+.import-error-note { margin: 0; }
+.import-edit-backdrop { align-items: center; padding: 18px; }
+.import-edit-modal { width: min(560px, 100%); max-height: calc(100dvh - 36px); overflow-y: auto; padding: 25px; border: 1px solid rgba(255,255,255,.76); border-radius: 22px; background: rgba(255,255,255,.98); box-shadow: 0 24px 70px rgba(27,34,48,.22); animation: modalIn 220ms cubic-bezier(.23,1,.32,1) both; }
+.import-edit-modal > .field-label, .import-edit-modal > .import-edit-field { margin-top: 18px; }
+.import-edit-modal .sheet-head h2 { margin-top: 8px; }
+@media (max-width: 640px) {
+  .import-review-item { align-items: flex-start; flex-direction: column; }
+  .import-review-actions { width: 100%; justify-content: space-between; }
+  .import-review-footer { align-items: stretch; flex-direction: column; }
+  .import-review-footer .primary-button, .import-review-footer .secondary-button { width: 100%; }
+  .import-edit-modal { padding: 21px 18px; border-radius: 20px; }
+}
