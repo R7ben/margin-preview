@@ -103,6 +103,7 @@ type Suggestion = {
 };
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const CALENDAR_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const RING_CIRCUMFERENCE = 2 * Math.PI * 86;
 function BrandMark({ className }: { className?: string }) {
   return (
@@ -358,6 +359,37 @@ const pickMaintenance = (tasks: FlexibleTask[], excludeId?: number) => {
   if (!active.length) return null;
   const minRank = Math.min(...active.map((task) => cognitiveRank[task.cognitiveLoad]));
   return active.find((task) => cognitiveRank[task.cognitiveLoad] === minRank) ?? null;
+};
+
+type TaskUrgency = "critical" | "urgent" | "normal" | "flexible";
+const dueDateForTask = (deadline: string | undefined, today = new Date()) => {
+  if (!deadline) return null;
+  const targetIndex = CALENDAR_DAYS.findIndex((day) => day.toLowerCase().startsWith(deadline.trim().toLowerCase().slice(0, 3)));
+  if (targetIndex < 0) return null;
+  const current = new Date(today);
+  current.setHours(0, 0, 0, 0);
+  current.setDate(current.getDate() + (targetIndex - current.getDay() + 7) % 7);
+  return current;
+};
+const taskUrgency = (deadline: string | undefined, today = new Date()): { tier: TaskUrgency; daysUntil: number | null } => {
+  const dueDate = dueDateForTask(deadline, today);
+  if (!dueDate) return { tier: "flexible", daysUntil: null };
+  const startOfToday = new Date(today);
+  startOfToday.setHours(0, 0, 0, 0);
+  const daysUntil = Math.round((dueDate.getTime() - startOfToday.getTime()) / 86400000);
+  if (daysUntil <= 0) return { tier: "critical", daysUntil };
+  if (daysUntil === 1) return { tier: "urgent", daysUntil };
+  if (daysUntil <= 4) return { tier: "normal", daysUntil };
+  return { tier: "flexible", daysUntil };
+};
+const dueLabelForTask = (deadline: string | undefined, today = new Date()) => {
+  const dueDate = dueDateForTask(deadline, today);
+  if (!dueDate) return { label: "no deadline", urgency: "flexible" as TaskUrgency };
+  const { tier, daysUntil: calculatedDaysUntil } = taskUrgency(deadline, today);
+  const daysUntil = calculatedDaysUntil ?? 0;
+  if (daysUntil <= 0) return { label: "today", urgency: tier };
+  if (daysUntil === 1) return { label: "tomorrow", urgency: tier };
+  return { label: dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }), urgency: tier };
 };
 
 const nextRecoveryBlock = (blocks: RecoveryBlock[]) => {
@@ -1213,12 +1245,21 @@ function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, show
   const activeTasks = tasks.filter((task) => !task.deferred);
   const mustDo = pickMustDo(tasks);
   const maintenance = pickMaintenance(tasks, mustDo?.id);
+  const today = new Date();
+  const lockInTasks = [mustDo ? { task: mustDo, tag: "Must-do" } : null, maintenance ? { task: maintenance, tag: "Maintenance" } : null].filter((item): item is { task: FlexibleTask; tag: string } => Boolean(item)).sort((a, b) => {
+    const urgencyRank: Record<TaskUrgency, number> = { critical: 0, urgent: 1, normal: 2, flexible: 3 };
+    const aUrgency = taskUrgency(a.task.deadline, today);
+    const bUrgency = taskUrgency(b.task.deadline, today);
+    return urgencyRank[aUrgency.tier] - urgencyRank[bUrgency.tier] || a.task.estimatedHours - b.task.estimatedHours;
+  });
   const nextBlock = nextRecoveryBlock(recoveryBlocks);
   const outcomeEmojis: { value: TaskOutcomeValue; icon: string }[] = [{ value: "Easy", icon: "🔥" }, { value: "Fine", icon: "🙂" }, { value: "Hard", icon: "😵" }, { value: "Disaster", icon: "💀" }];
-  const renderTaskRow = (task: FlexibleTask, tag?: string) => {
+  const renderTaskRow = (task: FlexibleTask, tag?: string, lockIn = false) => {
     const Icon = categoryIcon(task.category);
-    if (pendingOutcomeId === task.id) return <div className="task-row" key={task.id}><div className="outcome-feedback-row"><span>{task.name} — how did it go?</span><div className="outcome-emoji-group">{outcomeEmojis.map((item) => <button key={item.value} className="outcome-emoji-button" aria-label={item.value} onClick={() => { onRecordOutcome(task, item.value); setPendingOutcomeId(null); }}>{item.icon}</button>)}</div></div></div>;
-    return <div className="task-row" key={task.id}><div className="task-leading">{tag && <span className={`lock-in-tag lock-in-tag-${tag.toLowerCase().replace(/[^a-z]/g, "")}`}>{tag}</span>}<div className={`task-icon task-icon-${task.category}`}><Icon size={15} /></div><div><strong>{task.name}</strong><span>{formatHours(task.estimatedHours)} · {categoryLabel(task.category)} load · due {task.deadline}</span></div></div><button className="icon-button" aria-label={`Delete ${task.name}`} onClick={() => requestDelete(task.id)}><Trash2 size={16} /></button></div>;
+    const due = lockIn ? dueLabelForTask(task.deadline, today) : null;
+    const urgencyClass = lockIn ? ` task-row-urgency-${due?.urgency}` : "";
+    if (pendingOutcomeId === task.id) return <div className={`task-row${urgencyClass}`} key={task.id}><div className="outcome-feedback-row"><span>{task.name} — how did it go?</span><div className="outcome-emoji-group">{outcomeEmojis.map((item) => <button key={item.value} className="outcome-emoji-button" aria-label={item.value} onClick={() => { onRecordOutcome(task, item.value); setPendingOutcomeId(null); }}>{item.icon}</button>)}</div></div></div>;
+    return <div className={`task-row${urgencyClass}`} key={task.id}><div className="task-leading">{tag && <span className={`lock-in-tag lock-in-tag-${tag.toLowerCase().replace(/[^a-z]/g, "")}`}>{tag}</span>}<div className={`task-icon task-icon-${task.category}`}><Icon size={15} /></div><div><strong>{task.name}</strong><span>{formatHours(task.estimatedHours)} · {categoryLabel(task.category)} load · due {lockIn ? <em className={`due-label due-label-${due?.urgency}`}>{due?.label}</em> : task.deadline}</span></div></div><button className="icon-button" aria-label={`Delete ${task.name}`} onClick={() => requestDelete(task.id)}><Trash2 size={16} /></button></div>;
   };
   const moodPillTone: Record<MoodValue, string> = { Drained: "pill-negative", Okay: "pill-neutral", Good: "pill-neutral", Energized: "pill-positive" };
   const energyPillTone: Record<EnergyResponse, string> = { Rough: "pill-negative", Okay: "pill-neutral", Ready: "pill-positive" };
@@ -1267,10 +1308,9 @@ function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, show
     </section>
     {!showFullWeek ? (
       <section className="card tasks-panel lock-in-panel">
-        <div className="tasks-head"><div><span className="card-label">Today's Lock In</span><p className="card-subtitle">Things that matter most</p></div></div>
+        <div className="tasks-head"><div><span className="card-label">Today's Lock In</span><p className="card-subtitle">Things that matter most</p><div className="lock-in-legend"><span><i className="lock-in-legend-dot lock-in-legend-today" />Today</span><span><i className="lock-in-legend-dot lock-in-legend-tomorrow" />Tomorrow</span><span><i className="lock-in-legend-dot lock-in-legend-week" />This week</span></div></div></div>
         <div className="task-list">
-          {mustDo ? renderTaskRow(mustDo, "Must-do") : <div className="empty-state"><FileText size={19} /><span>No must-do task right now.</span></div>}
-          {maintenance ? renderTaskRow(maintenance, "Maintenance") : <div className="empty-state"><FileText size={19} /><span>No maintenance task right now.</span></div>}
+          {lockInTasks.length ? lockInTasks.map(({ task, tag }) => renderTaskRow(task, tag, true)) : <div className="empty-state"><FileText size={19} /><span>No lock-in task right now.</span></div>}
           {nextBlock ? <div className="task-row"><div className="task-leading"><span className="lock-in-tag lock-in-tag-recovery">Recovery</span><div className="task-icon task-icon-recovery"><LockKeyhole size={15} /></div><div><strong>{nextBlock.type}</strong><span>{nextBlock.day} · {nextBlock.startTime}–{nextBlock.endTime}</span></div></div></div> : <div className="task-row"><div className="task-leading"><span className="lock-in-tag lock-in-tag-recovery">Recovery</span><div className="task-icon task-icon-recovery"><LockKeyhole size={15} /></div><div><strong>No recovery block locked yet</strong><span>Protect one before the week fills up.</span></div></div><button className="text-action" onClick={onPlanner}>Open planner</button></div>}
         </div>
       </section>
