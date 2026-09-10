@@ -117,20 +117,16 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .app-shell-dashboard { background: #F5F1E8; }
 .app-frame { position: relative; width: 100%; max-width: 430px; min-height: 100vh; margin: 0 auto; }
 
-.topbar { min-height: 56px; }
+.topbar { min-height: 56px; padding-top: calc(12px + env(safe-area-inset-top)); background: #0b2e2b; border: none; box-shadow: none; }
 .topbar-inner { position: relative; display: flex; min-height: 56px; align-items: center; justify-content: center; padding: 0 16px; }
 .brand-lockup { display: inline-flex; align-items: center; gap: 8px; }
 .brand-mark { width: 20px; height: 20px; flex: 0 0 auto; }
 .brand-wordmark { font-size: 14px; letter-spacing: .18em; font-weight: 700; }
 .topbar-spacer { width: 20px; height: 20px; }
-.topbar-light { background: transparent; color: #1B2230; }
-.topbar-dark { background: transparent; color: white; }
+.topbar-light, .topbar-dark { color: white; }
 .hamburger-btn { display: inline-flex; position: absolute; left: 16px; align-items: center; justify-content: center; width: 32px; height: 32px; color: white; background: transparent; border-radius: 8px; }
 .hamburger-btn:hover { background: rgba(255,255,255,.12); }
 .topbar-back { display: inline-flex; align-items: center; gap: 6px; margin: 0 16px 4px; padding: 4px 0; color: rgba(255,255,255,.72); background: transparent; font-size: 12px; font-weight: 600; }
-.topbar-light .hamburger-btn { color: #1B2230; }
-.topbar-light .hamburger-btn:hover { background: rgba(27,34,48,.08); }
-.topbar-light .topbar-back { color: rgba(27,34,48,.72); }
 .nav-drawer-backdrop { position: fixed; inset: 0; z-index: 55; background: rgba(27,34,48,.34); animation: fadeIn 180ms ease-out both; }
 .nav-drawer { position: fixed; top: 0; left: 0; display: flex; width: min(300px, 82vw); height: 100%; flex-direction: column; padding: 18px 16px 24px; background: var(--surface); box-shadow: 0 0 40px rgba(27,34,48,.22); animation: navDrawerIn 220ms cubic-bezier(.23,1,.32,1) both; }
 @keyframes navDrawerIn { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }
