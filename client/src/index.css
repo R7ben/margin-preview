@@ -352,10 +352,11 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .triage-margin { display: flex; align-items: flex-end; flex-direction: column; gap: 7px; }
 .triage-margin span { color: #6E7280; font-size: 11px; }
 .triage-margin strong { font-size: 28px; font-weight: 600; letter-spacing: -.06em; }
-.triage-note { display: flex; align-items: center; gap: 7px; margin-top: 21px; color: #6E7280; font-size: 11px; }
+.triage-card { display: flex; flex-direction: column; }
+.triage-note { display: flex; align-items: center; gap: 7px; margin-top: 0; color: #6E7280; font-size: 11px; }
   .triage-note svg { color: #1F8A82; }
   .override-alert { margin: 14px 0 0; padding-left: 12px; color: #D14F3E; border-left: 3px solid #D14F3E; font-size: 12px; font-weight: 600; line-height: 1.5; }
-.triage-list { max-width: 750px; margin-top: 31px; border-top: 1px solid #E4E0EC; }
+.triage-list { max-width: 750px; margin-top: 18px; border-top: 1px solid #E4E0EC; }
 .triage-item { display: flex; width: 100%; min-height: 74px; align-items: center; gap: 13px; padding: 0 15px; border-bottom: 1px solid #E4E0EC; background: white; text-align: left; transition: border 180ms ease-out, background 180ms ease-out, transform 160ms ease-out; }
 .triage-item:hover { background: #FBF9FD; }
 .triage-item:active { transform: scale(.995); }
@@ -371,8 +372,8 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .triage-total span { color: #6E7280; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; }
 .triage-total strong { color: #1B2230; font-size: 19px; font-weight: 600; }
 .text-green { color: #5C7A16 !important; }
-.triage-page > .primary-button-wide { max-width: 750px; margin-top: 15px; }
-.outcome-panel { display: flex; max-width: 750px; align-items: center; gap: 15px; margin-top: 31px; padding: 19px; border-left: 3px solid; background: white; }
+.triage-card > .primary-button-wide { max-width: 750px; margin-top: 15px; }
+.outcome-panel { display: flex; max-width: 750px; align-items: center; gap: 15px; margin-top: 18px; padding: 19px; border-left: 3px solid; background: white; }
 .outcome-panel > svg { flex: 0 0 auto; }
 .outcome-panel strong { display: block; color: #1B2230; font-size: 14px; font-weight: 600; }
 .outcome-panel p { margin: 7px 0 0; color: #6E7280; font-size: 12px; line-height: 1.5; }
