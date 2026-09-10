@@ -41,6 +41,7 @@ import {
   X,
   Brain,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 type Screen = "onboarding" | "dashboard" | "mirror" | "triage" | "planner" | "reflection" | "import";
 type CognitiveLoad = "Low" | "Medium" | "High";
@@ -52,7 +53,7 @@ type EnergyResponse = "Rough" | "Okay" | "Ready";
 type EnergyCheckIn = { date: string; response: EnergyResponse };
 type MoodValue = "Drained" | "Okay" | "Good" | "Energized";
 type MoodCheckIn = { date: string; value: MoodValue };
-type ChatMessage = { role: "user" | "assistant"; content: string };
+type ChatMessage = { role: "user" | "assistant"; content: string; isError?: boolean };
 type RiskAssessment = { score: number; label: "Low" | "Moderate" | "High" | "Critical"; trend: "improving" | "stable" | "worsening"; trendSlope: number };
 
 type FixedCommitment = {
@@ -326,15 +327,6 @@ Recent mood check-ins: ${recentMoods}
 Recent energy check-ins: ${recentEnergy}
 Recent task outcome feedback: ${outcomeLines}
 Computed burnout risk (regression over check-in trend + schedule pressure): ${risk.score}/100, ${risk.label}, trend ${risk.trend}`;
-};
-
-const localFallbackReply = (risk: RiskAssessment, calculation: CalculationShape) => {
-  const lowestDayIndex = calculation.dailyMargins.reduce((lowest, margin, index, margins) => (margin < margins[lowest] ? index : lowest), 0);
-  const pressuredDay = DAYS[lowestDayIndex];
-  if (risk.label === "Critical") return `Based on your schedule, ${pressuredDay} is already breached and your recent check-ins show sustained strain (risk ${risk.score}/100). Adding anything new this week isn't advisable — defer or triage something first.`;
-  if (risk.label === "High") return `Your margin is tight and ${pressuredDay} is your pressure point (risk ${risk.score}/100, trend ${risk.trend}). A short task might fit, but anything over an hour will likely push ${pressuredDay} into deficit.`;
-  if (risk.label === "Moderate") return `You have some room this week (risk ${risk.score}/100), though ${pressuredDay} is worth watching. Should be manageable if you keep it small.`;
-  return `Your week has healthy margin and your recent check-ins look steady (risk ${risk.score}/100). This looks affordable.`;
 };
 
 function App() {
@@ -1291,17 +1283,14 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
     setChatMessages(nextMessages);
     setChatInput("");
 
+    // Rebuilt fresh on every call from the current props/state closure — never cached or reused across calls.
     const context = buildUserContext({ calculation, tasks, moodCheckIns, energyCheckIns, taskOutcomes, sleepHours, decompHours, risk });
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 
-    if (!apiKey) {
-      setChatMessages([...nextMessages, { role: "assistant", content: localFallbackReply(risk, calculation) }]);
-      return;
-    }
-
     setChatLoading(true);
-    const systemPreamble = `You are Margin, a calm recovery-first AI assistant embedded in a student planning app. Answer using ONLY the student's real data below — never invent facts. Be specific about which day or task is the concern, keep replies to 2-4 sentences, and ground every judgment in the computed burnout risk score and schedule data provided.\n\n${context}`;
+    const systemPreamble = `You are Margin, a recovery-first student planning assistant. Using ONLY the real data below, answer the student's question in 2-3 short sentences. Tell them honestly whether their Recovery Margin is comfortable, tight, or in deficit. If tight or in deficit, name one specific task they could defer. Be direct, warm, and brief — no bullet points, no headers, never invent facts not present below.\n\n${context}`;
     try {
+      if (!apiKey) throw new Error("missing API key");
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1317,21 +1306,25 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
       if (!response.ok) throw new Error("bad response");
       const data = await response.json();
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      setChatMessages([...nextMessages, { role: "assistant", content: text ? String(text).trim() : localFallbackReply(risk, calculation) }]);
+      if (!text) throw new Error("empty response");
+      setChatMessages([...nextMessages, { role: "assistant", content: String(text).trim() }]);
     } catch {
-      setChatMessages([...nextMessages, { role: "assistant", content: localFallbackReply(risk, calculation) }]);
+      setChatMessages([...nextMessages, { role: "assistant", content: "Couldn't reach Gemini — check your connection.", isError: true }]);
     } finally {
       setChatLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!name.trim() || hours <= 0) return;
-    const askKey = `${name.trim().toLowerCase()}|${hours}`;
+    const trimmedName = name.trim();
+    const question = trimmedName && hours > 0
+      ? `Can I fit "${trimmedName}" (${hours}h) into my week without burning out?`
+      : "Can I afford this?";
+    const askKey = `${trimmedName.toLowerCase()}|${hours}`;
     if (askedRef.current === askKey) return;
     const timer = setTimeout(() => {
       askedRef.current = askKey;
-      sendChatMessage(`Can I fit "${name.trim()}" (${hours}h) into my week without burning out?`);
+      sendChatMessage(question);
     }, 700);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1365,9 +1358,9 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
             <div className="chat-bubble chat-bubble-assistant"><Sparkles size={14} /> Ask me anything about your week — whether a task fits, what's driving your risk, or how you're trending.</div>
           )}
           {chatMessages.map((message, index) => (
-            <div key={index} className={`chat-bubble ${message.role === "user" ? "chat-bubble-user" : "chat-bubble-assistant"}`}>{message.role === "assistant" && <Sparkles size={14} />} {message.content}</div>
+            <div key={index} className={`chat-bubble ${message.role === "user" ? "chat-bubble-user" : "chat-bubble-assistant"} ${message.isError ? "chat-bubble-error" : ""}`}>{message.role === "assistant" && <Sparkles size={14} />} {message.content}</div>
           ))}
-          {chatLoading && <div className="chat-bubble chat-bubble-assistant chat-bubble-loading"><Sparkles size={14} /> Reading your schedule...</div>}
+          {chatLoading && <div className="chat-bubble chat-bubble-assistant chat-bubble-loading"><Spinner className="size-3.5" /> Reading your schedule...</div>}
         </div>
         <form className="chat-input-row" onSubmit={(event) => { event.preventDefault(); sendChatMessage(chatInput); }}>
           <input className="text-input" placeholder="Ask about your week..." value={chatInput} onChange={(event) => setChatInput(event.target.value)} />
