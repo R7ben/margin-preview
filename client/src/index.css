@@ -305,7 +305,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .outcome-emoji-button:hover { background: #E1F1EE; }
 .outcome-summary-line { margin-top: 14px; color: #6E7280; font-size: 12px; }
 .dashboard-actions, .reflection-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
-.quick-check-fab-wrap { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 40; }
+.quick-check-fab-wrap { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(80px + env(safe-area-inset-bottom)); z-index: 45; }
 .quick-check-fab { position: relative; display: inline-flex; width: 54px; height: 54px; align-items: center; justify-content: center; color: white; border-radius: 50%; background: var(--teal); box-shadow: 0 9px 22px rgba(27,34,48,.24); transition: transform 180ms ease-out, background 180ms ease-out, opacity 180ms ease-out; }
 .quick-check-fab:hover { background: #176E67; transform: translateY(-2px); }
 .quick-check-fab:active { transform: scale(.94); opacity: .85; }
