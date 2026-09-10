@@ -208,6 +208,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .primary-button, .secondary-button { display: flex; width: 100%; min-height: 50px; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border-radius: 10px; font-size: 13px; font-weight: 700; transition: transform 160ms ease-out, background 180ms ease-out, border-color 180ms ease-out, color 180ms ease-out; }
 .primary-button { color: white; background: var(--teal); }
 .primary-button:hover { background: #176E67; }
+.primary-button:disabled, .secondary-button:disabled { opacity: 1; color: #4B5165; background: #E4E0EC; }
 .primary-button:active, .secondary-button:active { transform: scale(.97); }
 .primary-button-wide { width: 100%; }
 .secondary-button { color: var(--navy); background: var(--pill-teal-bg); }

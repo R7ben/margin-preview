@@ -607,7 +607,7 @@ function App() {
     navTo("triage");
   };
 
-  const isDarkScreen = screen === "mirror" || screen === "triage" || screen === "planner" || screen === "reflection" || screen === "import";
+  const isDarkScreen = screen === "mirror" || screen === "planner" || screen === "reflection" || screen === "import";
 
   return (
     <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}`}>
