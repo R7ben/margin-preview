@@ -621,6 +621,7 @@ function App() {
   return (
     <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}`}>
       <div className="app-frame">
+        <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} />
         {screen === "onboarding" ? (
           <Onboarding
             sleepHours={sleepHours}
@@ -648,7 +649,6 @@ function App() {
                 />
         ) : (
           <>
-            <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} />
             <main className="page-wrap">
               {screen === "dashboard" && (
                 <Dashboard
@@ -859,14 +859,6 @@ function Onboarding(props: {
   const capacityStatus = statusFor(availableCapacity);
   const ONBOARD_RING_CIRC = 2 * Math.PI * 54;
   return (
-    <>
-        <header className="topbar topbar-light">
-          <div className="topbar-inner">
-            <span className="topbar-spacer" aria-hidden="true" />
-            <div className="brand-lockup"><BrandMark className="brand-mark" /><span className="brand-wordmark">MARGIN</span></div>
-            <span className="topbar-spacer" aria-hidden="true" />
-          </div>
-        </header>
         <main className="page-wrap onboarding-wrap">
           <div className="onboarding-tagline">
             <p>"Before your tasks, Set your limits"</p>
@@ -921,7 +913,6 @@ function Onboarding(props: {
 
           <button className="primary-button" onClick={props.onImport}><CalendarDays size={17} /> Import Schedule</button>
         </main>
-    </>
   );
 }
 
