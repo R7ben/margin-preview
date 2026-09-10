@@ -285,6 +285,7 @@ const TOTAL_WEEK_HOURS = 168;
 const capacityPercent = (availableHours: number, totalHours: number = TOTAL_WEEK_HOURS) => {
   return Math.round(Math.max(0, Math.min(1, availableHours / totalHours)) * 100);
 };
+const calculationForSimulation = (projectedMargin: number, draftHours: number, scenarioHours: number) => projectedMargin + draftHours - scenarioHours;
 
 const statusFor = (margin: number) => {
   if (margin < 0) return { label: "Breached", color: "#8B0000", soft: "#FFF5F5", copy: "Recovery floor exceeded" };
@@ -702,16 +703,16 @@ function App() {
     setScreen("mirror");
   };
 
-  const addTask = (isOverride = false) => {
+  const addTask = (isOverride = false, hoursOverride?: number, deferred = false) => {
     const name = draftName.trim() || "Untitled commitment";
     const suggestion = suggestionFor(name);
     const task: FlexibleTask = {
       id: Date.now(),
       name,
-      estimatedHours: Math.max(0.5, Number(draftHours) || suggestion.midpoint),
+      estimatedHours: Math.max(0.5, Number(hoursOverride ?? draftHours) || suggestion.midpoint),
       cognitiveLoad: suggestion.cognitiveLoad,
       deadline: draftDeadline,
-      deferred: false,
+      deferred,
       category: suggestion.category,
     };
     const nextOverrideCount = isOverride ? overrideCount + 1 : overrideCount;
@@ -1031,6 +1032,7 @@ function App() {
                   dailyBreachAmount={dailyBreachAmount}
                   sleepImpact={sleepImpact}
                   predictedHighLoadDays={predictedHighLoadDays}
+                  sleepHours={sleepHours}
                   showActions={showActions}
                   confirmBreach={confirmBreach}
                   setDraftName={(value) => { setDraftName(value); setDraftEstimateTouched(false); }}
@@ -1042,6 +1044,12 @@ function App() {
                   onSplit={() => { setDraftHours(Math.max(0.5, Math.round(draftHours / 2 * 10) / 10)); setShowActions(false); }}
                   onFindSlot={() => { setDraftDeadline(DAYS[(lowestDayIndex + 2) % 7]); setShowActions(false); }}
                   onDefer={() => openTriage(projectedMargin)}
+                  onChooseOption={(option) => {
+                    if (option === "decline") { setScreen("dashboard"); return; }
+                    if (option === "defer") { addTask(false, undefined, true); return; }
+                    if (option === "split") { addTask(false, Math.max(0.5, Math.round(draftHours / 2 * 10) / 10)); return; }
+                    addTask(false);
+                  }}
                 />
               )}
               {screen === "triage" && (
@@ -1478,7 +1486,19 @@ type CalculationShape = { fixedTotal: number; recoveryBlockTotal: number; tier2T
 type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
 const useCalculationShape = null as unknown as () => CalculationShape;
 
-function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargin, projectedStatus, consequenceDay, dailyBreachAmount, sleepImpact, predictedHighLoadDays, showActions, confirmBreach, setDraftName, setDraftHours, setDraftDeadline, setShowActions, onAddAnyway, onTriage, onSplit, onFindSlot, onDefer }: { draftName: string; draftHours: number; draftDeadline: string; projectedMargin: number; projectedStatus: ReturnType<typeof statusFor>; consequenceDay: string; dailyBreachAmount: number; sleepImpact: number; predictedHighLoadDays: number; showActions: boolean; confirmBreach: boolean; setDraftName: (value: string) => void; setDraftHours: (value: number) => void; setDraftDeadline: (value: string) => void; setShowActions: (value: boolean) => void; onAddAnyway: () => void; onTriage: () => void; onSplit: () => void; onFindSlot: () => void; onDefer: () => void }) {
+function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargin, projectedStatus, consequenceDay, dailyBreachAmount, sleepImpact, predictedHighLoadDays, sleepHours, showActions, confirmBreach, setDraftName, setDraftHours, setDraftDeadline, setShowActions, onAddAnyway, onTriage, onSplit, onFindSlot, onDefer, onChooseOption }: { draftName: string; draftHours: number; draftDeadline: string; projectedMargin: number; projectedStatus: ReturnType<typeof statusFor>; consequenceDay: string; dailyBreachAmount: number; sleepImpact: number; predictedHighLoadDays: number; sleepHours: number; showActions: boolean; confirmBreach: boolean; setDraftName: (value: string) => void; setDraftHours: (value: number) => void; setDraftDeadline: (value: string) => void; setShowActions: (value: boolean) => void; onAddAnyway: () => void; onTriage: () => void; onSplit: () => void; onFindSlot: () => void; onDefer: () => void; onChooseOption: (option: "addAnyway" | "split" | "defer" | "decline") => void }) {
+  const [showSimulator, setShowSimulator] = useState(false);
+  const [simulationResults, setSimulationResults] = useState<Record<string, { title: string; description: string; margin: number; status: "good" | "okay" | "tight"; sleep: number; recovery: string }>>({});
+  useEffect(() => {
+    const hasTask = draftName.trim().length > 0;
+    setShowSimulator(hasTask);
+    const splitHours = Math.max(0.5, Math.round(draftHours / 2 * 10) / 10);
+    const resultFor = (hours: number, title: string, description: string, recovery: string) => {
+      const margin = calculationForSimulation(projectedMargin, draftHours, hours);
+      return { title, description, margin: capacityPercent(margin), status: margin > 20 ? "good" as const : margin > 5 ? "okay" as const : "tight" as const, sleep: sleepHours, recovery };
+    };
+    setSimulationResults({ addAnyway: resultFor(draftHours, "Add it anyway", draftName, "Protected baseline"), split: resultFor(splitHours, "Split it", `${splitHours}h now`, "Protected baseline"), defer: resultFor(0, "Defer it", "Next week", "More recovery available"), decline: resultFor(0, "Decline it", "No task added", "Maximum recovery available") });
+  }, [draftName, draftHours, projectedMargin, sleepHours]);
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
   const recognitionRef = useRef<any>(null);
@@ -1550,6 +1570,7 @@ function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargi
       {stageTwo && <div className="consequence"><ShieldCheck size={19} /><span><strong>Recovery floor breached by {formatHours(dailyBreachAmount || Math.abs(projectedMargin))} on {consequenceDay}</strong><small>The protected floor is the first thing this schedule would cut.</small></span></div>}
       {stageTwo && <button className="triage-callout triage-callout-light" onClick={onTriage}><TriangleAlert size={17} /> Triage becomes the clearest next option <ArrowRight size={16} /></button>}
     </section>
+    {showSimulator && <section className="simulator-container"><h3>What if I say yes to this?</h3><div className="simulator-options">{(["addAnyway", "split", "defer", "decline"] as const).map((option) => { const result = simulationResults[option]; if (!result) return null; return <div key={option} className="simulator-column"><h4>{result.title}</h4><p className="simulator-subtitle">{result.description}</p><div className="simulator-metrics"><div className="simulator-metric"><span className="simulator-metric-label">Margin</span><strong className={`simulator-metric-value ${result.status}`}>{result.margin}%</strong><span className={`simulator-metric-status ${result.status}`}>{result.status === "good" ? "✓ Good" : result.status === "okay" ? "✓ Okay" : "⚠️ Tight"}</span></div><div className="simulator-metric"><span className="simulator-metric-label">Sleep</span><strong className="simulator-metric-value">{sleepHours}h</strong></div><div className="simulator-metric"><span className="simulator-metric-label">Recovery</span><strong className="simulator-metric-value">{result.recovery}</strong></div></div><button type="button" className="btn-choose" onClick={() => onChooseOption(option)}>Choose</button></div>; })}</div></section>}
 
     <section className="card mirror-input-card">
       <div className="section-kicker"><span>Input</span></div>
