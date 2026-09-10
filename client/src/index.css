@@ -228,7 +228,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .button-stack { display: flex; flex-direction: column; gap: 10px; }
 
 .dashboard-page, .mirror-page, .triage-page, .planner-page, .reflection-page { display: flex; flex-direction: column; gap: 12px; animation: pageIn 240ms cubic-bezier(.23,1,.32,1) both; }
-@keyframes pageIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pageIn { from { opacity: 0; } to { opacity: 1; } }
 .screen-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .checkin-card { display: flex; flex-direction: column; gap: 10px; }
 .dashboard-intro { padding: 4px 4px 0; text-align: center; }
@@ -299,9 +299,13 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .outcome-emoji-button:hover { background: #E1F1EE; }
 .outcome-summary-line { margin-top: 14px; color: #6E7280; font-size: 12px; }
 .dashboard-actions, .reflection-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
-.quick-check-fab { position: fixed; right: max(16px, calc((100vw - 430px) / 2 + 16px)); bottom: 24px; display: inline-flex; min-height: 48px; align-items: center; gap: 9px; padding: 0 15px; color: white; border-radius: 30px; background: #1B2230; box-shadow: 0 9px 22px rgba(27,34,48,.24); font-size: 12px; font-weight: 600; z-index: 20; transition: transform 180ms ease-out, background 180ms ease-out; }
-.quick-check-fab:hover { background: #12161E; transform: translateY(-2px); }
-.quick-check-fab:active { transform: scale(.97); }
+.quick-check-fab-wrap { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 40; }
+.quick-check-fab { position: relative; display: inline-flex; width: 54px; height: 54px; align-items: center; justify-content: center; color: white; border-radius: 50%; background: var(--teal); box-shadow: 0 9px 22px rgba(27,34,48,.24); transition: transform 180ms ease-out, background 180ms ease-out, opacity 180ms ease-out; }
+.quick-check-fab:hover { background: #176E67; transform: translateY(-2px); }
+.quick-check-fab:active { transform: scale(.94); opacity: .85; }
+.quick-check-fab-hint { position: absolute; right: 0; bottom: calc(100% + 10px); padding: 7px 12px; border-radius: 10px; color: white; background: #1B2230; font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 6px 18px rgba(27,34,48,.22); animation: fabHintIn 200ms ease-out both; }
+.quick-check-fab-hint::after { content: ""; position: absolute; top: 100%; right: 18px; border: 5px solid transparent; border-top-color: #1B2230; }
+@keyframes fabHintIn { from { opacity: 0; } to { opacity: 1; } }
 
 .mirror-tradeoff-card { display: flex; flex-direction: column; }
 .trade-ring-row { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 18px 0 6px; }

@@ -934,6 +934,13 @@ function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, show
   const [pendingOutcomeId, setPendingOutcomeId] = useState<number | null>(null);
   const pendingOutcomeIdRef = useRef<number | null>(null);
   useEffect(() => { pendingOutcomeIdRef.current = pendingOutcomeId; }, [pendingOutcomeId]);
+  const [showFabHint, setShowFabHint] = useState(() => typeof window !== "undefined" && !window.localStorage.getItem("marginFabHintSeen"));
+  useEffect(() => {
+    if (!showFabHint) return;
+    const timer = setTimeout(() => { setShowFabHint(false); window.localStorage.setItem("marginFabHintSeen", "1"); }, 3200);
+    return () => clearTimeout(timer);
+  }, [showFabHint]);
+  const dismissFabHint = () => { setShowFabHint(false); window.localStorage.setItem("marginFabHintSeen", "1"); };
   const requestDelete = (id: number) => {
     setPendingOutcomeId(id);
     setTimeout(() => {
@@ -1030,7 +1037,10 @@ function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, show
       <button className="primary-button" onClick={onAddTask}><Plus size={18} /> Add Task</button>
       <button className="secondary-button" onClick={onPlanner}><Leaf size={17} /> Recovery Planner</button>
     </div>
-    <button className="quick-check-fab" onClick={onQuickCheck}><MessageCircleQuestion size={18} /> <span>Can I afford this?</span></button>
+    <div className="quick-check-fab-wrap">
+      {showFabHint && <span className="quick-check-fab-hint">Can I afford this?</span>}
+      <button className="quick-check-fab" aria-label="Can I afford this? Quick check" onClick={() => { dismissFabHint(); onQuickCheck(); }}><MessageCircleQuestion size={22} /></button>
+    </div>
   </div>;
 }
 
