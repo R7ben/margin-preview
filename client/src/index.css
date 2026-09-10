@@ -200,7 +200,6 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .capacity-panel { display: flex; flex-direction: column; gap: 16px; }
 .capacity-panel-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .capacity-panel-top .card-label { display: flex; align-items: center; gap: 6px; }
-.capacity-start-button { width: auto; min-height: 36px; padding: 0 14px; font-size: 11px; }
 .capacity-hero-row { display: flex; align-items: center; gap: 18px; }
 .capacity-ring { position: relative; display: flex; width: 108px; height: 108px; flex: 0 0 auto; align-items: center; justify-content: center; }
 .capacity-ring-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
@@ -223,6 +222,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .primary-button:disabled, .secondary-button:disabled { opacity: 1; color: #4B5165; background: #E4E0EC; }
 .primary-button:active, .secondary-button:active { transform: scale(.97); opacity: .85; }
 .primary-button-wide { width: 100%; }
+.capacity-start-button { width: auto; }
 .secondary-button { color: var(--navy); background: var(--pill-teal-bg); }
 .secondary-button:hover { background: #CDEAE3; }
 .button-stack { display: flex; flex-direction: column; gap: 10px; }
