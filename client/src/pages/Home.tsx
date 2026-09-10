@@ -91,7 +91,16 @@ type Suggestion = {
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const RING_CIRCUMFERENCE = 2 * Math.PI * 86;
-const MARK_URL = "/manus-storage/margin-mark_0f2827e1.png";
+function BrandMark({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M8 3 L3.5 3 L3.5 8" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 21 L20.5 21 L20.5 16" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 3 L20.5 3 L20.5 8" stroke="var(--teal)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 21 L3.5 21 L3.5 16" stroke="var(--teal)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 const initialFixedCommitments: FixedCommitment[] = [
   { id: 1, name: "Seminar", days: ["Tue", "Thu"], startTime: "10:00", endTime: "12:00", hours: 4 },
@@ -772,7 +781,7 @@ function Header({ screen, onBack }: { screen: Screen; onBack: () => void }) {
       <div className="topbar-inner">
         <button className="hamburger-btn" aria-label="Menu" onClick={onBack}><Menu size={20} /></button>
         <div className="brand-lockup">
-          <img src={MARK_URL} alt="" className="brand-mark" />
+          <BrandMark className="brand-mark" />
           <span className="brand-wordmark">MARGIN</span>
         </div>
         <span className="topbar-spacer" aria-hidden="true" />
@@ -814,7 +823,7 @@ function Onboarding(props: {
         <header className="topbar topbar-light">
           <div className="topbar-inner">
             <span className="topbar-spacer" aria-hidden="true" />
-            <div className="brand-lockup"><img src={MARK_URL} alt="" className="brand-mark" /><span className="brand-wordmark">MARGIN</span></div>
+            <div className="brand-lockup"><BrandMark className="brand-mark" /><span className="brand-wordmark">MARGIN</span></div>
             <span className="topbar-spacer" aria-hidden="true" />
           </div>
         </header>
