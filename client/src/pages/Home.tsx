@@ -45,6 +45,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { useTheme } from "../contexts/ThemeContext";
+import { StressPatternChart } from "../components/StressPatternChart";
 
 type Screen = "onboarding" | "dashboard" | "mirror" | "triage" | "planner" | "reflection" | "import" | "settings" | "guide" | "outcomes-summary";
 type CognitiveLoad = "Low" | "Medium" | "High";
@@ -1548,6 +1549,15 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
   </div>;
 }
 
+const calculateWeeklyStressPattern = (moodChecks: MoodCheckIn[], dates: Date[], recoveryBlocks: RecoveryBlock[], recoveryTarget = 7) => dates.map((date) => {
+  const entries = moodChecks.filter((entry) => entryDateKey(entry.date) === localDateKey(date));
+  const moodScale: Record<MoodValue, number> = { Drained: 9, Okay: 6, Good: 3, Energized: 1 };
+  const average = entries.length ? entries.reduce((sum, entry) => sum + moodScale[entry.value], 0) / entries.length : 5;
+  const day = date.toLocaleDateString("en-US", { weekday: "short" });
+  const hasRecovery = recoveryBlocks.some((block) => block.locked && block.day.slice(0, 3) === day);
+  const stress = Math.max(1, Math.min(10, average - (hasRecovery ? 1.5 : 0)));
+  return { day, stress, isAboveFloor: stress > recoveryTarget, hasRecovery, above: stress > recoveryTarget ? stress : recoveryTarget, below: stress <= recoveryTarget ? stress : recoveryTarget };
+});
 type CalculationShape = { fixedTotal: number; recoveryBlockTotal: number; tier2Total: number; availableCapacity: number; flexTotal: number; margin: number; dailyMargins: number[]; dailyFixed: number[]; dailyRecoveryBlocks: number[]; dailyTask: number[]; longestRun: number; distributionWarning: boolean; status: ReturnType<typeof statusFor>; categoryBreakdown: { mental: number; physical: number; social: number; errands: number; time: number } };
 type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
 const useCalculationShape = null as unknown as () => CalculationShape;
@@ -1835,6 +1845,8 @@ function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, en
   reflectionWeekMonday.setHours(0, 0, 0, 0);
   reflectionWeekMonday.setDate(reflectionWeekMonday.getDate() - ((reflectionWeekMonday.getDay() + 6) % 7));
   const last7Days = Array.from({ length: 7 }, (_, offset) => { const date = new Date(reflectionWeekMonday); date.setDate(date.getDate() + offset); const dayLabel = date.toLocaleDateString("en-US", { weekday: "short" }); const average = calculateDailyMoodAverage(date, moodCheckIns); const energyChecks = energyCheckIns.filter((entry) => entryDateKey(entry.date) === localDateKey(date)); return { date, dayLabel, average, energyValue: energyChecks.at(-1)?.response ?? null }; });
+  const [showStressChart, setShowStressChart] = useState(false);
+  const stressData = calculateWeeklyStressPattern(moodCheckIns, last7Days.map((day) => day.date), recoveryBlocks);
   const weeklyMoodValues = last7Days.map((day) => day.average).filter((value): value is number => value !== null);
   const avgCheckInScore = weeklyMoodValues.length ? weeklyMoodValues.reduce((sum, score) => sum + score, 0) / weeklyMoodValues.length : null;
   const moodLabelForAverage = (average: number | null) => average === null ? "No check-in" : average >= 3.5 ? "Energized" : average >= 2.5 ? "Good" : average >= 1.5 ? "Okay" : "Drained";
@@ -1878,8 +1890,8 @@ function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, en
     <section className="card stress-pattern">
       <span className="card-label">Stress Pattern</span>
       <div className="stress-pattern-list">{last7Days.map((day) => <div className="stress-pattern-row" key={day.dayLabel}><span className="stress-pattern-day">{day.dayLabel}</span><span className="stress-pattern-value">{day.average === null ? "No check-in" : `${moodDotsForAverage(day.average)} ${day.average.toFixed(1)} · ${moodLabelForAverage(day.average)}`}</span></div>)}</div>
-      <p className="stress-pattern-insight">{moodRecoveryInsight}</p>
-    </section>
+      <p className="stress-pattern-insight">{moodRecoveryInsight}</p><button className="btn-expand" onClick={() => setShowStressChart(true)}>📈 Expand chart</button>
+    </section>{showStressChart && <div className="modal-overlay" onClick={() => setShowStressChart(false)}><div className="modal-content" onClick={(event) => event.stopPropagation()}><StressPatternChart stressData={stressData} recoveryTarget={7} onClose={() => setShowStressChart(false)} /></div></div>}
     <section className="card reflection-insight-card">
       <div className="insight-row"><Moon size={16} /><span><strong>This week's goal</strong><small>Your hardest day: {DAYS[hardestIndex]}. Consider protecting {DAYS[hardestIndex]} evening.</small></span></div>
       <button className="insight-row insight-row-action" onClick={onNextWeek}><BarChart3 size={16} /><span><strong>Week in insight</strong><small>Your hardest day was {DAYS[hardestIndex]}.</small></span><span className="insight-link">See full insight <ArrowRight size={13} /></span></button>
