@@ -1465,6 +1465,44 @@ type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
 const useCalculationShape = null as unknown as () => CalculationShape;
 
 function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargin, projectedStatus, consequenceDay, dailyBreachAmount, sleepImpact, predictedHighLoadDays, showActions, confirmBreach, setDraftName, setDraftHours, setDraftDeadline, setShowActions, onAddAnyway, onTriage, onSplit, onFindSlot, onDefer }: { draftName: string; draftHours: number; draftDeadline: string; projectedMargin: number; projectedStatus: ReturnType<typeof statusFor>; consequenceDay: string; dailyBreachAmount: number; sleepImpact: number; predictedHighLoadDays: number; showActions: boolean; confirmBreach: boolean; setDraftName: (value: string) => void; setDraftHours: (value: number) => void; setDraftDeadline: (value: string) => void; setShowActions: (value: boolean) => void; onAddAnyway: () => void; onTriage: () => void; onSplit: () => void; onFindSlot: () => void; onDefer: () => void }) {
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(true);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const browserWindow = window as Window & { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any };
+    setSpeechSupported(Boolean(browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition));
+    return () => { recognitionRef.current?.abort?.(); };
+  }, []);
+
+  const startSpeechRecognition = () => {
+    if (typeof window === "undefined") return;
+    const browserWindow = window as Window & { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any };
+    const SpeechRecognition = browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition;
+    if (!SpeechRecognition) { setSpeechSupported(false); toast.error("Speech not supported on this device"); return; }
+    recognitionRef.current?.abort?.();
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.onstart = () => setIsListening(true);
+    recognition.onresult = (event: any) => {
+      let transcript = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) transcript += `${event.results[index][0].transcript} `;
+      setDraftName(transcript.trim());
+    };
+    recognition.onerror = (event: { error?: string }) => {
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") toast.error("Please enable microphone in your browser settings");
+      else if (event.error === "no-speech") toast.error("Couldn't hear you — try again");
+      else toast.error("Couldn't hear you — try again");
+      setIsListening(false);
+    };
+    recognition.onend = () => { setIsListening(false); recognitionRef.current = null; };
+    recognitionRef.current = recognition;
+    try { recognition.start(); } catch { setIsListening(false); toast.error("Couldn't start speech recognition — try again"); }
+  };
+
   const stageTwo = projectedMargin < 0;
   const TRADE_RING_CIRC = 2 * Math.PI * 54;
   const beforePercent = capacityPercent(projectedMargin + draftHours);
@@ -1502,7 +1540,7 @@ function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargi
     <section className="card mirror-input-card">
       <div className="section-kicker"><span>Input</span></div>
       <div className="quick-add-grid">{QUICK_ADD_PRESETS.map((preset) => { const Icon = categoryIcon(suggestionFor(preset.name).category); return <button key={preset.name} type="button" className="quick-add-tile" onClick={() => { setDraftName(preset.name); setDraftHours(preset.hours); }}><Icon size={15} /><span><strong>{preset.name}</strong><small>{formatShortHours(preset.hours)} · {preset.displayCategory}</small></span></button>; })}</div>
-      <label className="field-label">Other task/commitment?<input autoFocus className="task-input" placeholder="Type here..." value={draftName} onChange={(event) => setDraftName(event.target.value)} /></label>
+      <label className="field-label">Other task/commitment?<div className="task-input-group"><input autoFocus className="task-input" placeholder="Type here..." value={draftName} onChange={(event) => setDraftName(event.target.value)} /><button type="button" className={`mic-button${isListening ? " listening" : ""}`} onClick={startSpeechRecognition} title={speechSupported ? "Speak your task" : "Speech not supported"} aria-label="Speak your task" disabled={!speechSupported}>🎤</button></div>{isListening && <div className="listening-indicator">🎙️ Listening...</div>}{!speechSupported && <div className="speech-support-note">Speech not supported on this device</div>}</label>
       <div className="mirror-field-row">
         <label className="field-label">Est time<input className="number-input" type="number" min="0.5" step="0.5" value={draftHours} onChange={(event) => setDraftHours(Number(event.target.value))} /></label>
         <label className="field-label">Day<select className="text-input" value={draftDeadline} onChange={(event) => setDraftDeadline(event.target.value)}>{DAYS.map((day) => <option key={day} value={day}>{day}</option>)}</select></label>
