@@ -286,6 +286,28 @@ const capacityPercent = (availableHours: number, totalHours: number = TOTAL_WEEK
   return Math.round(Math.max(0, Math.min(1, availableHours / totalHours)) * 100);
 };
 const calculationForSimulation = (projectedMargin: number, draftHours: number, scenarioHours: number) => projectedMargin + draftHours - scenarioHours;
+const fullDayName = (day: string) => CALENDAR_DAYS.find((name) => name.toLowerCase().startsWith(day.slice(0, 3).toLowerCase())) ?? day;
+type DayRisk = { day: string; totalHours: number; load: { mental: number; physical: number; social: number; fixed: number }; hasRecoveryBlock: boolean; riskLevel: "high" | "medium" | "low"; riskNarrative: string };
+const analyzeDayRisk = (day: string, tasks: FlexibleTask[], fixedCommitments: FixedCommitment[], recoveryBlocks: RecoveryBlock[]): DayRisk => {
+  const dayTasks = tasks.filter((task) => !task.deferred && task.deadline.toLowerCase().startsWith(day.slice(0, 3).toLowerCase()));
+  const dayFixed = fixedCommitments.filter((commitment) => commitment.days.some((commitmentDay) => commitmentDay.toLowerCase().startsWith(day.slice(0, 3).toLowerCase())));
+  const load = { mental: dayTasks.filter((task) => task.category === "mental").length, physical: dayTasks.filter((task) => task.category === "physical" || task.category === "errands").length, social: dayTasks.filter((task) => task.category === "social").length, fixed: dayFixed.length };
+  const totalHours = dayTasks.reduce((sum, task) => sum + task.estimatedHours, 0) + dayFixed.reduce((sum, commitment) => sum + commitment.hours / Math.max(1, commitment.days.length), 0);
+  const hasRecoveryBlock = recoveryBlocks.some((block) => block.locked && block.day.toLowerCase().startsWith(day.slice(0, 3).toLowerCase()));
+  let score = totalHours > 10 ? 30 : totalHours > 8 ? 15 : 0;
+  score += load.mental >= 3 ? 25 : load.mental === 2 ? 10 : 0;
+  if (Object.values(load).filter((value) => value > 0).length >= 3) score += 20;
+  if (!hasRecoveryBlock) score += 15;
+  const stressors: string[] = [];
+  if (load.mental >= 3) stressors.push(`${load.mental} mental-load tasks`);
+  if (load.physical >= 2) stressors.push(`${load.physical} physical tasks`);
+  if (load.social >= 2) stressors.push(`${load.social} social commitments`);
+  if (load.fixed >= 1) stressors.push(load.fixed === 1 ? "a shift or fixed commitment" : `${load.fixed} fixed commitments`);
+  if (!hasRecoveryBlock) stressors.push("no protected recovery time");
+  const readableDay = fullDayName(day);
+  return { day, totalHours, load, hasRecoveryBlock, riskLevel: score > 60 ? "high" : score > 30 ? "medium" : "low", riskNarrative: stressors.length ? `${readableDay} has ${stressors.join(", ")}. Consider protecting recovery.` : `${readableDay} is manageable.` };
+};
+const analyzeWeekRisk = (tasks: FlexibleTask[], fixedCommitments: FixedCommitment[], recoveryBlocks: RecoveryBlock[]) => DAYS.map((day) => analyzeDayRisk(day, tasks, fixedCommitments, recoveryBlocks));
 
 const statusFor = (margin: number) => {
   if (margin < 0) return { label: "Breached", color: "#8B0000", soft: "#FFF5F5", copy: "Recovery floor exceeded" };
@@ -597,6 +619,7 @@ function App() {
   const [selectedTriage, setSelectedTriage] = useState<number[]>([]);
   const [triageOutcome, setTriageOutcome] = useState<TriageOutcome>(null);
   const [protectedOutcomes, setProtectedOutcomes] = useState<ProtectedOutcomes | null>(null);
+  const [riskRepairMessage, setRiskRepairMessage] = useState<string | null>(null);
   const [showCommitmentForm, setShowCommitmentForm] = useState(false);
   const [commitmentName, setCommitmentName] = useState("");
   const [commitmentDays, setCommitmentDays] = useState<string[]>([]);
@@ -928,10 +951,15 @@ function App() {
     const beforeMargin = calculation.margin;
     const beforeRecoveryBlocks = recoveryBlocks.filter((block) => block.locked).length;
     const afterMargin = beforeMargin + released;
+    const updatedTasks = tasks.map((task) => selectedTriage.includes(task.id) ? { ...task, deferred: true } : task);
+    const beforeRisks = analyzeWeekRisk(tasks, fixedCommitments, recoveryBlocks);
+    const afterRisks = analyzeWeekRisk(updatedTasks, fixedCommitments, recoveryBlocks);
+    const repairedDay = beforeRisks.find((day) => day.riskLevel !== "low" && afterRisks.find((nextDay) => nextDay.day === day.day)?.riskLevel === "low");
+    setRiskRepairMessage(repairedDay ? `You fixed ${fullDayName(repairedDay.day)}'s risk. It now has protected recovery and manageable load.` : null);
     setProtectedOutcomes(calculateProtectedOutcomes(beforeMargin, afterMargin, beforeRecoveryBlocks, beforeRecoveryBlocks, sleepHours * 7, sleepHours * 7));
     const deficitBeforeSelection = Math.max(0, -triageBaseMargin);
     const deficitAfterSelection = Math.max(0, deficitBeforeSelection - released);
-    setTasks((current) => current.map((task) => selectedTriage.includes(task.id) ? { ...task, deferred: true } : task));
+    setTasks(() => updatedTasks);
     setTriageOutcomeDeficit(deficitAfterSelection);
     if (deficitAfterSelection === 0) setTriageOutcome("full");
     else if (released > 0) setTriageOutcome("partial");
@@ -1016,6 +1044,7 @@ function App() {
                   onPlanner={() => navTo("planner")}
                   onReflection={() => navTo("reflection")}
                   onTriage={() => openTriage()}
+                  onRebalance={(day) => { setDraftDeadline(day); startMirror(); }}
                   onRecordOutcome={recordTaskOutcome}
                   onDeleteTaskSilently={deleteTaskSilently}
                   onEnergyRespond={respondEnergyCheckIn}
@@ -1112,7 +1141,7 @@ function App() {
               )}
               {screen === "settings" && <Settings onBack={() => navTo("dashboard")} />}
               {screen === "guide" && <Guide step={guideStep} setStep={setGuideStep} onClose={() => setScreen(guideReturnScreen)} onDone={() => navTo("dashboard")} />}
-              {screen === "outcomes-summary" && protectedOutcomes && <OutcomesSummary outcomes={protectedOutcomes} onDashboard={() => navTo("dashboard")} />}
+              {screen === "outcomes-summary" && protectedOutcomes && <OutcomesSummary outcomes={protectedOutcomes} riskRepairMessage={riskRepairMessage} onDashboard={() => navTo("dashboard")} />}
             </main>
           </>
         )}
@@ -1326,7 +1355,11 @@ function RangeCard({ icon, label, value, note, min, max, step, inputValue, onCha
   return <div className="range-card"><div className="range-card-head"><div className="range-icon">{icon}</div><div><span className="range-label">{label}</span><p>{note}</p></div><strong>{value}</strong></div><input aria-label={label} type="range" min={min} max={max} step={step} value={inputValue} onChange={(event) => onChange(Number(event.target.value))} /></div>;
 }
 
-function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showEnergyCheckIn, showMorningCheckIn, onMorningCheckInRespond, onAddTask, onQuickCheck, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, onTriage, onRecordOutcome, onDeleteTaskSilently, onEnergyRespond }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; fixedCommitments: FixedCommitment[]; recoveryBlocks: RecoveryBlock[]; showEnergyCheckIn: boolean; showMorningCheckIn: boolean; onMorningCheckInRespond: (value: MoodValue) => void; onAddTask: () => void; onQuickCheck: () => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; onTriage: () => void; onRecordOutcome: (task: FlexibleTask, outcome: TaskOutcomeValue) => void; onDeleteTaskSilently: (id: number) => void; onEnergyRespond: (response: EnergyResponse) => void }) {
+function BurnoutRiskPanel({ atRiskDays, onRebalance }: { atRiskDays: DayRisk[]; onRebalance: (day: string) => void }) {
+  if (!atRiskDays.length) return <section className="burnout-panel burnout-balanced"><h3>✓ Week Looks Balanced</h3><p>No days are at high risk. Keep protecting recovery blocks.</p></section>;
+  return <section className="burnout-panel"><h3>⚠️ Days at Risk</h3>{atRiskDays.map((day) => <div key={day.day} className={`risk-card risk-${day.riskLevel}`}><div className="risk-day"><strong>{fullDayName(day.day)}</strong><span>{day.riskLevel} risk · {formatShortHours(day.totalHours)} scheduled</span></div><div className="risk-narrative">{day.riskNarrative}</div><button className="btn-secondary-sm" onClick={() => onRebalance(day.day)}>Rebalance</button></div>)}</section>;
+}
+function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showEnergyCheckIn, showMorningCheckIn, onMorningCheckInRespond, onAddTask, onQuickCheck, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, onTriage, onRebalance, onRecordOutcome, onDeleteTaskSilently, onEnergyRespond }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; fixedCommitments: FixedCommitment[]; recoveryBlocks: RecoveryBlock[]; showEnergyCheckIn: boolean; showMorningCheckIn: boolean; onMorningCheckInRespond: (value: MoodValue) => void; onAddTask: () => void; onQuickCheck: () => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; onTriage: () => void; onRebalance: (day: string) => void; onRecordOutcome: (task: FlexibleTask, outcome: TaskOutcomeValue) => void; onDeleteTaskSilently: (id: number) => void; onEnergyRespond: (response: EnergyResponse) => void }) {
   const [showFullWeek, setShowFullWeek] = useState(false);
   const [dailyView, setDailyView] = useState<"week" | "day">("week");
   const [dailyDate, setDailyDate] = useState(() => new Date());
@@ -1401,6 +1434,8 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
   const energyPillTone: Record<EnergyResponse, string> = { Rough: "pill-negative", Okay: "pill-neutral", Ready: "pill-positive" };
   const totalCategoryHours = Object.values(calculation.categoryBreakdown).reduce((sum, value) => sum + value, 0);
   const maxDailyMargin = Math.max(...calculation.dailyMargins, 1);
+  const riskAnalysis = analyzeWeekRisk(tasks, fixedCommitments, recoveryBlocks);
+  const atRiskDays = riskAnalysis.filter((day) => day.riskLevel !== "low");
   return <div className="dashboard-page">
     {showMorningCheckIn && <section className="card checkin-card"><span className="card-label">How do you feel today?</span><div className="pill-row">{MOOD_OPTIONS.map((option) => <button key={option.value} className={`pill pill-button ${moodPillTone[option.value]}`} onClick={() => onMorningCheckInRespond(option.value)}>{option.value}</button>)}</div></section>}
     {recoveryQualityBlock && !recoveryQualityDismissed && <RecoveryQualityCard block={recoveryQualityBlock} onSelect={onRecoveryQuality} />}
@@ -1425,6 +1460,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
       {calculation.distributionWarning && <div className="distribution-warning"><TriangleAlert size={16} /> Recovery concentrated later in the week</div>}
       {calculation.margin <= 0 && <button className="triage-callout" onClick={onTriage}><TriangleAlert size={17} /> Recovery deficit detected <ArrowRight size={16} /></button>}
     </section>
+    {dailyView === "week" && <BurnoutRiskPanel atRiskDays={atRiskDays} onRebalance={onRebalance} />}
     <section className="card week-glance-card">
       <span className="card-label">Week at Glance</span>
       <div className="week-glance-list">{DAYS.map((day, index) => { const dayStatus = dailyStatusFor(calculation.dailyMargins[index]); const width = Math.max(8, Math.min(100, (calculation.dailyMargins[index] / maxDailyMargin) * 100)); return <div key={day} className="week-glance-row"><span className="week-glance-day">{day}</span><span className="week-glance-track"><span className="week-glance-fill" style={{ width: `${width}%`, background: dayStatus.color }} title={`${day}: ${dayStatus.label} · ${formatShortHours(calculation.dailyMargins[index])}`} /></span></div>; })}</div>
@@ -1725,8 +1761,8 @@ function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtec
   </div>;
 }
 
-function OutcomesSummary({ outcomes, onDashboard }: { outcomes: ProtectedOutcomes; onDashboard: () => void }) {
-  return <div className="outcomes-card"><div className="outcomes-heading"><CircleCheck size={22} /><span>Rebalancing applied</span></div><p className="outcomes-lede">You just protected:</p><div className="outcomes-list">{outcomes.protectedSleep > 0 && <div className="outcome-item"><span className="outcome-icon">😴</span><span>{outcomes.protectedSleep} hour{outcomes.protectedSleep === 1 ? "" : "s"} of sleep</span></div>}{outcomes.conflictsRemoved > 0 && <div className="outcome-item"><span className="outcome-icon">🔓</span><span>{outcomes.conflictsRemoved} recovery conflict{outcomes.conflictsRemoved === 1 ? "" : "s"}</span></div>}{outcomes.protectedMargin > 0 && <div className="outcome-item"><span className="outcome-icon">📈</span><span>{outcomes.protectedMargin} hour{outcomes.protectedMargin === 1 ? "" : "s"} of recovery margin</span></div>}{outcomes.protectedSleep <= 0 && outcomes.conflictsRemoved <= 0 && outcomes.protectedMargin <= 0 && <div className="outcome-item"><span className="outcome-icon">⚠️</span><span>No additional margin was restored</span></div>}</div><p className="outcome-insight">{calculateRiskMessage(outcomes)}</p><div className="outcome-buttons"><button className="secondary-button" onClick={onDashboard}>Back to schedule</button><button className="primary-button" onClick={onDashboard}>View week</button></div></div>;
+function OutcomesSummary({ outcomes, riskRepairMessage, onDashboard }: { outcomes: ProtectedOutcomes; riskRepairMessage: string | null; onDashboard: () => void }) {
+  return <div className="outcomes-card"><div className="outcomes-heading"><CircleCheck size={22} /><span>Rebalancing applied</span></div><p className="outcomes-lede">You just protected:</p><div className="outcomes-list">{outcomes.protectedSleep > 0 && <div className="outcome-item"><span className="outcome-icon">😴</span><span>{outcomes.protectedSleep} hour{outcomes.protectedSleep === 1 ? "" : "s"} of sleep</span></div>}{outcomes.conflictsRemoved > 0 && <div className="outcome-item"><span className="outcome-icon">🔓</span><span>{outcomes.conflictsRemoved} recovery conflict{outcomes.conflictsRemoved === 1 ? "" : "s"}</span></div>}{outcomes.protectedMargin > 0 && <div className="outcome-item"><span className="outcome-icon">📈</span><span>{outcomes.protectedMargin} hour{outcomes.protectedMargin === 1 ? "" : "s"} of recovery margin</span></div>}{outcomes.protectedSleep <= 0 && outcomes.conflictsRemoved <= 0 && outcomes.protectedMargin <= 0 && <div className="outcome-item"><span className="outcome-icon">⚠️</span><span>No additional margin was restored</span></div>}</div><p className="outcome-insight">{riskRepairMessage ?? calculateRiskMessage(outcomes)}</p><div className="outcome-buttons"><button className="secondary-button" onClick={onDashboard}>Back to schedule</button><button className="primary-button" onClick={onDashboard}>View week</button></div></div>;
 }
 
 function Guide({ step, setStep, onClose, onDone }: { step: number; setStep: Dispatch<SetStateAction<number>>; onClose: () => void; onDone: () => void }) {
