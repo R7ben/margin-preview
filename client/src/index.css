@@ -117,6 +117,20 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .app-shell-dashboard { background: #F5F1E8; }
 .app-frame { position: relative; width: 100%; max-width: 430px; min-height: 100vh; margin: 0 auto; }
 
+.toast-notification { position: fixed; top: env(safe-area-inset-top); left: 50%; z-index: 100; display: flex; width: 100%; max-width: 430px; flex-direction: column; gap: 10px; padding: 12px 16px; color: white; background: #0b2e2b; border-radius: 0; box-shadow: 0 4px 12px rgba(0,0,0,.15); transform: translateX(-50%); animation: toastSlideDown 300ms ease-out both; }
+.toast-notification-dismissing { animation: toastFadeOut 200ms ease-in both; }
+.toast-notification-title { font-size: 14px; font-weight: 700; line-height: 1.25; }
+.toast-notification-actions { display: flex; width: 100%; gap: 7px; }
+.toast-mood-button { min-width: 0; flex: 1; padding: 6px 8px; color: white; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.2; transition: filter 160ms ease-out, transform 160ms ease-out; }
+.toast-mood-button:hover { filter: brightness(1.08); }
+.toast-mood-button:active { transform: scale(.96); }
+.toast-mood-drained { background: #d14f3e; }
+.toast-mood-okay { background: #c97f1e; }
+.toast-mood-good { background: #5c7a16; }
+.toast-mood-energized { background: #1f8a82; }
+@keyframes toastSlideDown { from { opacity: 0; transform: translate(-50%, -100%); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes toastFadeOut { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -8px); } }
+
 .topbar { min-height: 56px; padding-top: calc(12px + env(safe-area-inset-top)); background: #0b2e2b; border: none; box-shadow: none; }
 .topbar-inner { position: relative; display: flex; min-height: 56px; align-items: center; justify-content: center; padding: 0 16px; }
 .brand-lockup { display: inline-flex; align-items: center; gap: 8px; }

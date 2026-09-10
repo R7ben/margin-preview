@@ -312,6 +312,10 @@ const MOOD_OPTIONS: { value: MoodValue; emoji: string }[] = [
   { value: "Energized", emoji: "⚡" },
 ];
 
+const LAST_MOOD_CHECK_KEY = "lastMoodCheck";
+const MOOD_LOG_KEY = "moodLog";
+const MOOD_CHECK_INTERVAL = 4 * 60 * 60 * 1000;
+
 const moodMeta = (value: MoodValue) => {
   if (value === "Drained") return { emoji: "😩", color: "#C1121F" };
   if (value === "Okay") return { emoji: "😐", color: "#F4A261" };
@@ -403,6 +407,61 @@ const predictBurnoutRisk = ({ calculation, moodCheckIns, energyCheckIns }: { cal
   return { score, label, trend, trendSlope: Number(trendSlope.toFixed(2)) };
 };
 
+function ToastNotification({ screen, lastMoodCheck, onMoodSelect }: { screen: Screen; lastMoodCheck: number | null; onMoodSelect: (value: MoodValue) => void }) {
+  const [visible, setVisible] = useState(false);
+  const [dismissing, setDismissing] = useState(false);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const readLastMoodCheck = () => {
+    if (typeof window === "undefined") return lastMoodCheck ?? 0;
+    const stored = Number(window.localStorage.getItem(LAST_MOOD_CHECK_KEY));
+    return Math.max(Number.isFinite(stored) ? stored : 0, lastMoodCheck ?? 0);
+  };
+
+  const markDismissed = () => {
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    if (typeof window !== "undefined") window.localStorage.setItem(LAST_MOOD_CHECK_KEY, String(Date.now()));
+    setDismissing(true);
+    hideTimerRef.current = setTimeout(() => {
+      setVisible(false);
+      setDismissing(false);
+    }, 200);
+  };
+
+  useEffect(() => {
+    if (visible || dismissing) return;
+    const lastCheck = readLastMoodCheck();
+    if (lastCheck && Date.now() - lastCheck < MOOD_CHECK_INTERVAL) return;
+    setVisible(true);
+    dismissTimerRef.current = setTimeout(markDismissed, 8000);
+    return () => {
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    };
+    // Navigation re-evaluates eligibility without allowing stacked notifications.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, lastMoodCheck, visible, dismissing]);
+
+  useEffect(() => () => {
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+  }, []);
+
+  if (!visible) return null;
+  return (
+    <div className={`toast-notification${dismissing ? " toast-notification-dismissing" : ""}`} role="status" aria-live="polite">
+      <div className="toast-notification-title">🎯 How are you feeling right now?</div>
+      <div className="toast-notification-actions">
+        {MOOD_OPTIONS.map((option) => (
+          <button key={option.value} type="button" className={`toast-mood-button toast-mood-${option.value.toLowerCase()}`} onClick={() => { onMoodSelect(option.value); markDismissed(); }}>
+            {option.value}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Retrieval step of the RAG loop: pulls the student's own locally-stored data (schedule, check-ins,
 // outcomes) into a structured context block so the model answers from real facts, not invented ones.
 const buildUserContext = ({ calculation, tasks, moodCheckIns, energyCheckIns, taskOutcomes, sleepHours, decompHours, risk }: { calculation: CalculationShape; tasks: FlexibleTask[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; taskOutcomes: TaskOutcomeRecord[]; sleepHours: number; decompHours: number; risk: RiskAssessment }) => {
@@ -464,6 +523,11 @@ function App() {
   const [taskOutcomes, setTaskOutcomes] = useState<TaskOutcomeRecord[]>([]);
   const [energyCheckIns, setEnergyCheckIns] = useState<EnergyCheckIn[]>([]);
   const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckIn[]>([]);
+  const [lastMoodCheck, setLastMoodCheck] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    const stored = Number(window.localStorage.getItem(LAST_MOOD_CHECK_KEY));
+    return Number.isFinite(stored) && stored > 0 ? stored : null;
+  });
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
@@ -595,7 +659,16 @@ function App() {
   };
 
   const respondMorningCheckIn = (value: MoodValue) => {
+    const timestamp = Date.now();
     setMoodCheckIns((current) => [...current.filter((entry) => entry.date !== todayKey), { date: todayKey, value }]);
+    setLastMoodCheck(timestamp);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LAST_MOOD_CHECK_KEY, String(timestamp));
+      let storedLog: unknown = [];
+      try { storedLog = JSON.parse(window.localStorage.getItem(MOOD_LOG_KEY) ?? "[]"); } catch { storedLog = []; }
+      const moodLog = Array.isArray(storedLog) ? storedLog : [];
+      window.localStorage.setItem(MOOD_LOG_KEY, JSON.stringify([...moodLog, { timestamp, value }]));
+    }
   };
 
   const addItFromPreview = () => {
@@ -770,6 +843,7 @@ function App() {
   return (
     <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}${screen === "dashboard" ? " app-shell-dashboard" : ""}`}>
       <div className="app-frame">
+        <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} />
         <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} />
         <div key={screen} className="screen-enter">
         {screen === "onboarding" ? (
