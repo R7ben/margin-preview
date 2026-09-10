@@ -19,3 +19,16 @@
 - [ ] Add automated regression tests for Consequence Preview and Import Schedule approval.
 - [ ] Add expandable per-day load details behind Today’s margin dots.
 - [ ] Run integration, regression, responsive, and production checks.
+
+
+
+
+
+
+
+## Gemini model migration
+
+- [ ] Find all gemini-2.0-flash references in the active request path.
+- [ ] Replace them with gemini-3.6-flash.
+- [ ] Run typecheck and production build.
+- [ ] Push and verify the refreshed deployment and QuickCheck behavior.

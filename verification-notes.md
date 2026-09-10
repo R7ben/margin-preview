@@ -55,3 +55,7 @@ Consequence Preview setup validation: a 290-hour task on the loaded week surface
 Consequence Preview verification: selecting Add Anyway opens a modal with projected margin, pressure-point day, See impact, Add anyway, and Reschedule actions. Confirming Add anyway returns to Today with the task added, Breached status, -210 hrs margin, and the recovery deficit callout.
 
 Final visual verification: desktop onboarding cleanly exposes Import Schedule beside Add Commitment; mobile 375px keeps the new entry point, capacity card, and Start Planning CTA readable and usable. Weekly Reflection shows the Week 37 Ignition hook, and the overloaded Commitment Mirror flow shows the Consequence Preview modal before confirmation.
+
+QuickCheck FAB restoration verification: On Today, the FAB remained fixed in the bottom-right above the bottom tab bar after scrolling to the page bottom and back to the top. At the bottom viewport it was visibly separated from the tab bar and remained targetable with the accessible label “Can I afford this? Quick check.”
+
+QuickCheck Gemini debug: Reproduced from Today → Add Task → “?” FAB. The modal’s automatic request showed the generic connection error because `sendChatMessage` throws `missing API key` before calling Gemini whenever `import.meta.env.VITE_GEMINI_API_KEY` is absent. No Gemini request appeared in the network log, confirming this is configuration, not browser connectivity. Updated the catch path to say Gemini is not configured and name the required environment variable. Fresh reopen verified the new message in the modal.
