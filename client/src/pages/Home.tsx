@@ -42,8 +42,9 @@ import {
   Brain,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
+import { toast } from "sonner";
 
-type Screen = "onboarding" | "dashboard" | "mirror" | "triage" | "planner" | "reflection" | "import";
+type Screen = "onboarding" | "dashboard" | "mirror" | "triage" | "planner" | "reflection" | "import" | "settings";
 type CognitiveLoad = "Low" | "Medium" | "High";
 type TaskCategory = "mental" | "social" | "physical" | "errands";
 type TriageOutcome = "full" | "partial" | "failure" | null;
@@ -498,8 +499,16 @@ function ToastNotification({ screen, lastMoodCheck, onMoodSelect }: { screen: Sc
 
   useEffect(() => {
     if (visible || dismissing) return;
+    if (typeof window !== "undefined" && JSON.parse(window.localStorage.getItem("notifications-enabled") ?? "true") === false) return;
     const lastCheck = readLastMoodCheck();
-    if (lastCheck && Date.now() - lastCheck < MOOD_CHECK_INTERVAL) return;
+    const interval = typeof window !== "undefined" ? window.localStorage.getItem("notification-interval") ?? "4" : "4";
+    if (interval === "manual") return;
+    const now = new Date();
+    const lastDate = lastCheck ? new Date(lastCheck) : null;
+    const todayAt = (hour: number) => { const date = new Date(now); date.setHours(hour, 0, 0, 0); return date.getTime(); };
+    const scheduledEligible = interval === "once" ? now.getTime() >= todayAt(9) && (!lastDate || lastDate.getTime() < todayAt(9)) : interval === "twice" ? (now.getTime() >= todayAt(17) && (!lastDate || lastDate.getTime() < todayAt(17))) || (now.getTime() >= todayAt(9) && (!lastDate || lastDate.getTime() < todayAt(9))) : false;
+    const eligible = interval === "once" || interval === "twice" ? scheduledEligible : !lastCheck || Date.now() - lastCheck >= Number(interval) * 60 * 60 * 1000;
+    if (!eligible) return;
     setVisible(true);
     dismissTimerRef.current = setTimeout(markDismissed, 8000);
     return () => {
@@ -1077,6 +1086,7 @@ function App() {
                   onManual={() => navTo("onboarding")}
                 />
               )}
+              {screen === "settings" && <Settings onBack={() => navTo("dashboard")} />}
             </main>
           </>
         )}
@@ -1119,7 +1129,7 @@ function App() {
             </button>
           </div>
         )}
-        {screen !== "onboarding" && screen !== "import" && screen !== "triage" && <BottomTabBar active={screen} onNavigate={navTo} />}
+        {screen !== "onboarding" && screen !== "import" && screen !== "triage" && screen !== "settings" && <BottomTabBar active={screen} onNavigate={navTo} />}
       </div>
       <NavDrawer open={drawerOpen} activeScreen={screen} onNavigate={(next) => { navTo(next); setDrawerOpen(false); }} onClose={() => setDrawerOpen(false)} />
     </div>
@@ -1133,6 +1143,7 @@ const NAV_ITEMS: { id: Screen; label: string; icon: ReactNode; sub?: boolean }[]
   { id: "planner", label: "Recovery Planner", icon: <Moon size={18} /> },
   { id: "reflection", label: "Weekly Reflection", icon: <BarChart3 size={18} /> },
   { id: "import", label: "Import Schedule", icon: <Upload size={18} /> },
+  { id: "settings", label: "Settings", icon: <SlidersHorizontal size={18} /> },
 ];
 
 const BOTTOM_TAB_ICONS: Record<string, ReactNode> = {
@@ -1634,6 +1645,18 @@ function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtec
     </div>
     {unlockTarget !== null && <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="unlock-confirm-title"><div className="planner-confirm-sheet"><h2 id="unlock-confirm-title">{unlockTarget === "all" ? "Remove all recovery blocks?" : "Remove this recovery block?"}</h2><p>{unlockTarget === "all" ? "All protected recovery time this week will be released." : "This will free up the time but reduce your protected recovery for the week."}</p><div className="planner-confirm-actions"><button className="primary-button primary-button-danger" onClick={onConfirmUnlock}>{unlockTarget === "all" ? "Yes, unlock all" : "Yes, remove it"}</button><button className="secondary-button" onClick={onCancelUnlock}>{unlockTarget === "all" ? "Keep them protected" : "Keep it protected"}</button></div></div></div>}
   </div>;
+}
+
+function Settings({ onBack }: { onBack: () => void }) {
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => typeof window === "undefined" ? true : JSON.parse(window.localStorage.getItem("notifications-enabled") ?? "true"));
+  const [reminderInterval, setReminderInterval] = useState(() => typeof window === "undefined" ? "4" : window.localStorage.getItem("notification-interval") ?? "4");
+  const handleSave = () => {
+    window.localStorage.setItem("notifications-enabled", JSON.stringify(notificationsEnabled));
+    window.localStorage.setItem("notification-interval", reminderInterval);
+    toast.success("Settings saved");
+  };
+  const intervalOptions = [{ value: "2", label: "Every 2 hours" }, { value: "4", label: "Every 4 hours" }, { value: "6", label: "Every 6 hours" }, { value: "twice", label: "Twice a day (9am, 5pm)" }, { value: "once", label: "Once a day (9am)" }, { value: "manual", label: "Manual only (I'll check in)" }];
+  return <div className="settings-screen"><div className="settings-heading"><button className="text-button settings-back-button" onClick={onBack}><ArrowLeft size={14} /> Settings</button><h1>Settings</h1></div><section className="card settings-card"><span className="card-label">Notifications</span><label className="settings-toggle-row"><span><strong>Mood Check Reminders</strong><small>Prompt you to log how you feel.</small></span><input type="checkbox" checked={notificationsEnabled} onChange={(event) => setNotificationsEnabled(event.target.checked)} /></label><div className="settings-option-group"><span className="settings-option-label">How often?</span><div className="interval-options">{intervalOptions.map((option) => <label key={option.value}><input type="radio" name="notification-interval" value={option.value} checked={reminderInterval === option.value} onChange={(event) => setReminderInterval(event.target.value)} />{option.label}</label>)}</div></div><button className="primary-button" onClick={handleSave}>Save preferences</button></section></div>;
 }
 
 function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, energyCheckIns, recoveryBlocks, onNextWeek, onAdjust }: { calculation: CalculationShape; overrideCount: number; taskOutcomes: TaskOutcomeRecord[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; recoveryBlocks: RecoveryBlock[]; onNextWeek: () => void; onAdjust: () => void }) {
