@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
+  Bell,
   BookOpen,
   CalendarCheck2,
   CalendarDays,
@@ -528,7 +529,7 @@ const predictBurnoutRisk = ({ calculation, moodCheckIns, energyCheckIns }: { cal
   return { score, label, trend, trendSlope: Number(trendSlope.toFixed(2)) };
 };
 
-function ToastNotification({ screen, lastMoodCheck, onMoodSelect }: { screen: Screen; lastMoodCheck: number | null; onMoodSelect: (value: MoodValue) => void }) {
+function ToastNotification({ screen, lastMoodCheck, onMoodSelect, demoTrigger }: { screen: Screen; lastMoodCheck: number | null; onMoodSelect: (value: MoodValue) => void; demoTrigger: number }) {
   const [visible, setVisible] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -549,6 +550,15 @@ function ToastNotification({ screen, lastMoodCheck, onMoodSelect }: { screen: Sc
       setDismissing(false);
     }, 200);
   };
+
+  useEffect(() => {
+    if (!demoTrigger) return;
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    setDismissing(false);
+    setVisible(true);
+    dismissTimerRef.current = setTimeout(markDismissed, 8000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demoTrigger]);
 
   useEffect(() => {
     if (visible || dismissing) return;
@@ -661,6 +671,7 @@ function App() {
     const stored = Number(window.localStorage.getItem(LAST_MOOD_CHECK_KEY));
     return Number.isFinite(stored) && stored > 0 ? stored : null;
   });
+  const [demoNotificationToken, setDemoNotificationToken] = useState(0);
   const [checkInNotice, setCheckInNotice] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [guideStep, setGuideStep] = useState(0);
@@ -1019,9 +1030,9 @@ function App() {
   return (
     <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}${screen === "dashboard" ? " app-shell-dashboard" : ""}`}>
       <div className="app-frame">
-        <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} />
+        <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} demoTrigger={demoNotificationToken} />
         {checkInNotice && <div className="checkin-log-toast" role="status" aria-live="polite">{checkInNotice}</div>}
-        <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} onHelp={() => navTo("guide")} />
+        <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} onHelp={() => navTo("guide")} onTestNotification={() => setDemoNotificationToken((token) => token + 1)} />
         <div key={screen} className="screen-enter">
         {screen === "onboarding" ? (
           <Onboarding
@@ -1278,7 +1289,7 @@ function NavDrawer({ open, activeScreen, onNavigate, onClose }: { open: boolean;
   );
 }
 
-function Header({ screen, isDark, onBack, onMenu, onHelp }: { screen: Screen; isDark: boolean; onBack: () => void; onMenu: () => void; onHelp: () => void }) {
+function Header({ screen, isDark, onBack, onMenu, onHelp, onTestNotification }: { screen: Screen; isDark: boolean; onBack: () => void; onMenu: () => void; onHelp: () => void; onTestNotification: () => void }) {
   const { theme, toggleTheme } = useTheme();
   return (
     <header className={`topbar ${isDark ? "topbar-dark" : "topbar-light"}`}>
@@ -1289,6 +1300,7 @@ function Header({ screen, isDark, onBack, onMenu, onHelp }: { screen: Screen; is
           <span className="brand-wordmark">MARGIN</span>
         </div>
         {screen !== "guide" && <button className="help-button" aria-label="How it works" title="How it works" onClick={onHelp}>?</button>}
+        <button className="test-notification-btn" aria-label="Test mood notification" title="Test notification (demo only)" onClick={onTestNotification}><Bell size={16} /></button>
         <button className="theme-toggle" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={toggleTheme}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
         <span className="topbar-spacer" aria-hidden="true" />
       </div>
