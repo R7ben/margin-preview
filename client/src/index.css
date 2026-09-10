@@ -424,16 +424,16 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 @keyframes fabHintIn { from { opacity: 0; } to { opacity: 1; } }
 
 .mirror-tradeoff-card { display: flex; flex-direction: column; }
-.simulator-container { margin: 20px 0; padding: 16px; border-left: 4px solid #1D9E75; border-radius: 12px; background: rgba(29,158,117,.05); }
-.simulator-container h3 { margin: 0; color: #1B2230; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; }
+.simulator-container { margin: 20px 0; padding: 16px; border-left: 4px solid #1D9E75; border-radius: 12px; background: #FFFFFF; color: #000000; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.simulator-container h3 { margin: 0; color: #000000; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; }
 .simulator-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
-.simulator-column { padding: 10px 8px; border: 1px solid #E5E7EB; border-radius: 8px; background: white; text-align: center; font-size: 11px; }
-.simulator-column h4 { min-height: 27px; margin: 0 0 4px; color: #1F2937; font-size: 11px; font-weight: 700; }
-.simulator-subtitle { min-height: 28px; margin: 0 0 8px; color: #9CA3AF; font-size: 10px; line-height: 1.35; }
+.simulator-column { padding: 10px 8px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; color: #000000; text-align: center; font-size: 11px; }
+.simulator-column h4 { min-height: 27px; margin: 0 0 4px; color: #000000; font-size: 11px; font-weight: 700; }
+.simulator-subtitle { min-height: 28px; margin: 0 0 8px; color: #000000; font-size: 10px; line-height: 1.35; }
 .simulator-metrics { display: flex; flex-direction: column; gap: 9px; margin: 8px 0; }
 .simulator-metric { display: flex; flex-direction: column; gap: 2px; }
-.simulator-metric-label { color: #6B7280; font-size: 9px; text-transform: uppercase; }
-.simulator-metric-value { color: #1F2937; font-size: 13px; line-height: 1.25; }
+.simulator-metric-label { color: #000000; font-size: 9px; text-transform: uppercase; }
+.simulator-metric-value { color: #000000; font-size: 13px; line-height: 1.25; }
 .simulator-metric-value.good, .simulator-metric-status.good { color: #059669; }
 .simulator-metric-value.okay, .simulator-metric-status.okay { color: #C97F1E; }
 .simulator-metric-value.tight, .simulator-metric-status.tight { color: #DC2626; }
