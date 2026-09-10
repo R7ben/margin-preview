@@ -150,7 +150,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .screen-title-block h1 { margin: 0; color: white; font-family: var(--font-display); font-size: 26px; font-weight: 800; letter-spacing: -.01em; line-height: 1.15; text-transform: uppercase; }
 .screen-title-block p { margin: 6px 0 0; color: rgba(255,255,255,.6); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
 
-.card { padding: 18px; border: 1px solid rgba(255,255,255,.4); border-radius: 16px; background: rgba(255,255,255,.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.card { padding: 18px; border: 1px solid rgba(255,255,255,.4); border-radius: 16px; background: rgba(255,255,255,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.app-shell-dark .card { background: #ffffff; border-color: rgba(27,34,48,.08); backdrop-filter: none; -webkit-backdrop-filter: none; }
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
 .pill-negative { color: var(--pill-coral-text); background: var(--pill-coral-bg); }
 .pill-neutral { color: var(--pill-amber-text); background: var(--pill-amber-bg); }
