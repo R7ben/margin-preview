@@ -316,6 +316,41 @@ const MOOD_OPTIONS: { value: MoodValue; emoji: string }[] = [
 const LAST_MOOD_CHECK_KEY = "lastMoodCheck";
 const MOOD_LOG_KEY = "moodLog";
 const MOOD_CHECK_INTERVAL = 4 * 60 * 60 * 1000;
+const MOOD_CHECKS_PREFIX = "mood-checks-";
+const ENERGY_CHECKS_PREFIX = "energy-checks-";
+const MOOD_SCALE: Record<MoodValue, number> = { Drained: 1, Okay: 2, Good: 3, Energized: 4 };
+
+const localDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+const entryDateKey = (value: string) => localDateKey(new Date(value));
+const readStoredChecks = <T,>(prefix: string, date: Date) => {
+  if (typeof window === "undefined") return [] as T[];
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(`${prefix}${localDateKey(date)}`) ?? "[]");
+    return Array.isArray(stored) ? stored as T[] : [];
+  } catch { return [] as T[]; }
+};
+const calculateDailyMoodAverage = (date: Date, checks: MoodCheckIn[] = readStoredChecks<MoodCheckIn>(MOOD_CHECKS_PREFIX, date)) => {
+  const matching = checks.filter((check) => entryDateKey(check.date) === localDateKey(date));
+  if (!matching.length) return null;
+  return matching.reduce((sum, check) => sum + MOOD_SCALE[check.value], 0) / matching.length;
+};
+const loadStoredMoodChecks = () => {
+  if (typeof window === "undefined") return [] as MoodCheckIn[];
+  const checks: MoodCheckIn[] = [];
+  for (let offset = 0; offset < 14; offset += 1) { const date = new Date(); date.setDate(date.getDate() - offset); checks.push(...readStoredChecks<MoodCheckIn>(MOOD_CHECKS_PREFIX, date)); }
+  return checks;
+};
+const loadStoredEnergyChecks = () => {
+  if (typeof window === "undefined") return [] as EnergyCheckIn[];
+  const checks: EnergyCheckIn[] = [];
+  for (let offset = 0; offset < 14; offset += 1) { const date = new Date(); date.setDate(date.getDate() - offset); checks.push(...readStoredChecks<EnergyCheckIn>(ENERGY_CHECKS_PREFIX, date)); }
+  return checks;
+};
 
 const moodMeta = (value: MoodValue) => {
   if (value === "Drained") return { emoji: "😩", color: "#C1121F" };
@@ -554,13 +589,14 @@ function App() {
   const [recoveryQuality, setRecoveryQuality] = useState<"Fully" | "Partially" | "Not really" | null>(null);
   const [recoveryQualityDismissed, setRecoveryQualityDismissed] = useState(false);
   const [taskOutcomes, setTaskOutcomes] = useState<TaskOutcomeRecord[]>([]);
-  const [energyCheckIns, setEnergyCheckIns] = useState<EnergyCheckIn[]>([]);
-  const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckIn[]>([]);
+  const [energyCheckIns, setEnergyCheckIns] = useState<EnergyCheckIn[]>(loadStoredEnergyChecks);
+  const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckIn[]>(loadStoredMoodChecks);
   const [lastMoodCheck, setLastMoodCheck] = useState<number | null>(() => {
     if (typeof window === "undefined") return null;
     const stored = Number(window.localStorage.getItem(LAST_MOOD_CHECK_KEY));
     return Number.isFinite(stored) && stored > 0 ? stored : null;
   });
+  const [checkInNotice, setCheckInNotice] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
@@ -571,8 +607,8 @@ function App() {
   }, [drawerOpen]);
 
   const todayKey = new Date().toDateString();
-  const showMorningCheckIn = !moodCheckIns.some((entry) => entry.date === todayKey);
-  const todayEnergyCheckIn = energyCheckIns.find((entry) => entry.date === todayKey) ?? null;
+  const showMorningCheckIn = true;
+  const todayEnergyCheckIn = energyCheckIns.filter((entry) => entryDateKey(entry.date) === localDateKey(new Date())).at(-1) ?? null;
 
   const calculation = useMemo(() => {
     const fixedTotal = fixedCommitments.reduce((sum, item) => sum + item.hours, 0);
@@ -621,7 +657,7 @@ function App() {
   const triageBaseMargin = triageMarginOverride ?? calculation.margin;
   const remainingDeficit = triageOutcomeDeficit ?? Math.max(0, -triageBaseMargin - selectedRecovery);
   const deferCandidate = triageItems.length ? triageItems.reduce((best, task) => (task.estimatedHours > best.estimatedHours ? task : best), triageItems[0]) : null;
-  const showEnergyCheckIn = Math.min(...calculation.dailyMargins) < 5 && !todayEnergyCheckIn;
+  const showEnergyCheckIn = Math.min(...calculation.dailyMargins) < 5;
 
   const loadPattern = useMemo(() => {
     const active = tasks.filter((task) => !task.deferred);
@@ -688,19 +724,35 @@ function App() {
   };
 
   const respondEnergyCheckIn = (response: EnergyResponse) => {
-    setEnergyCheckIns((current) => [...current.filter((entry) => entry.date !== todayKey), { date: todayKey, response }]);
+    const timestamp = new Date().toISOString();
+    const entry = { date: timestamp, response };
+    setEnergyCheckIns((current) => [...current, entry]);
+    setCheckInNotice(`Logged: ${response} at ${new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
+    window.setTimeout(() => setCheckInNotice(null), 2600);
+    if (typeof window !== "undefined") {
+      const key = `${ENERGY_CHECKS_PREFIX}${localDateKey(new Date(timestamp))}`;
+      const checks = readStoredChecks<EnergyCheckIn>(ENERGY_CHECKS_PREFIX, new Date(timestamp));
+      window.localStorage.setItem(key, JSON.stringify([...checks, entry]));
+    }
   };
 
   const respondMorningCheckIn = (value: MoodValue) => {
     const timestamp = Date.now();
-    setMoodCheckIns((current) => [...current.filter((entry) => entry.date !== todayKey), { date: todayKey, value }]);
+    const entry = { date: new Date(timestamp).toISOString(), value };
+    setMoodCheckIns((current) => [...current, entry]);
     setLastMoodCheck(timestamp);
+    setCheckInNotice(`Logged: ${value} at ${new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
+    window.setTimeout(() => setCheckInNotice(null), 2600);
     if (typeof window !== "undefined") {
       window.localStorage.setItem(LAST_MOOD_CHECK_KEY, String(timestamp));
+      const date = new Date(timestamp);
+      const key = `${MOOD_CHECKS_PREFIX}${localDateKey(date)}`;
+      const checks = readStoredChecks<MoodCheckIn>(MOOD_CHECKS_PREFIX, date);
+      window.localStorage.setItem(key, JSON.stringify([...checks, entry]));
       let storedLog: unknown = [];
       try { storedLog = JSON.parse(window.localStorage.getItem(MOOD_LOG_KEY) ?? "[]"); } catch { storedLog = []; }
       const moodLog = Array.isArray(storedLog) ? storedLog : [];
-      window.localStorage.setItem(MOOD_LOG_KEY, JSON.stringify([...moodLog, { timestamp, value }]));
+      window.localStorage.setItem(MOOD_LOG_KEY, JSON.stringify([...moodLog, entry]));
     }
   };
 
@@ -889,6 +941,7 @@ function App() {
     <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}${screen === "dashboard" ? " app-shell-dashboard" : ""}`}>
       <div className="app-frame">
         <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} />
+        {checkInNotice && <div className="checkin-log-toast" role="status" aria-live="polite">{checkInNotice}</div>}
         <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} />
         <div key={screen} className="screen-enter">
         {screen === "onboarding" ? (
@@ -1006,6 +1059,7 @@ function App() {
                   taskOutcomes={taskOutcomes}
                   moodCheckIns={moodCheckIns}
                   energyCheckIns={energyCheckIns}
+                  recoveryBlocks={recoveryBlocks}
                   onNextWeek={() => navTo("onboarding")}
                   onAdjust={() => navTo("onboarding")}
                 />
@@ -1582,23 +1636,35 @@ function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtec
   </div>;
 }
 
-function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, energyCheckIns, onNextWeek, onAdjust }: { calculation: CalculationShape; overrideCount: number; taskOutcomes: TaskOutcomeRecord[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; onNextWeek: () => void; onAdjust: () => void }) {
+function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, energyCheckIns, recoveryBlocks, onNextWeek, onAdjust }: { calculation: CalculationShape; overrideCount: number; taskOutcomes: TaskOutcomeRecord[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; recoveryBlocks: RecoveryBlock[]; onNextWeek: () => void; onAdjust: () => void }) {
   const hardestIndex = calculation.dailyMargins.reduce((lowest, margin, index, margins) => margin < margins[lowest] ? index : lowest, 0);
   const maintained = Math.round(calculation.tier2Total);
   const floorProtectedDays = calculation.dailyMargins.filter((margin) => margin >= 0).length;
   const outcomeCounts = { Easy: 0, Fine: 0, Hard: 0, Disaster: 0 };
   taskOutcomes.forEach((record) => { outcomeCounts[record.outcome] += 1; });
-  const moodByDay = new Map(moodCheckIns.map((entry) => [new Date(entry.date).toLocaleDateString("en-US", { weekday: "short" }), entry.value]));
-  const energyByDay = new Map(energyCheckIns.map((entry) => [new Date(entry.date).toLocaleDateString("en-US", { weekday: "short" }), entry.response]));
-  const last7Days = Array.from({ length: 7 }, (_, offset) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (6 - offset));
-    const dayLabel = date.toLocaleDateString("en-US", { weekday: "short" });
-    return { dayLabel, moodValue: moodByDay.get(dayLabel) ?? null, energyValue: energyByDay.get(dayLabel) ?? null };
-  });
-  const weeklyCheckInScores = last7Days.flatMap((day) => [day.moodValue ? CHECKIN_QUALITY_SCORE[day.moodValue] : null, day.energyValue ? CHECKIN_QUALITY_SCORE[day.energyValue] : null]).filter((score): score is number => score !== null);
-  const avgCheckInScore = weeklyCheckInScores.length ? weeklyCheckInScores.reduce((sum, score) => sum + score, 0) / weeklyCheckInScores.length : null;
-  const recoveryQualityLabel = avgCheckInScore === null ? null : avgCheckInScore < 1 ? "Needs attention" : avgCheckInScore < 2 ? "Moderate" : "Well restored";
+  const reflectionWeekMonday = new Date();
+  reflectionWeekMonday.setHours(0, 0, 0, 0);
+  reflectionWeekMonday.setDate(reflectionWeekMonday.getDate() - ((reflectionWeekMonday.getDay() + 6) % 7));
+  const last7Days = Array.from({ length: 7 }, (_, offset) => { const date = new Date(reflectionWeekMonday); date.setDate(date.getDate() + offset); const dayLabel = date.toLocaleDateString("en-US", { weekday: "short" }); const average = calculateDailyMoodAverage(date, moodCheckIns); const energyChecks = energyCheckIns.filter((entry) => entryDateKey(entry.date) === localDateKey(date)); return { date, dayLabel, average, energyValue: energyChecks.at(-1)?.response ?? null }; });
+  const weeklyMoodValues = last7Days.map((day) => day.average).filter((value): value is number => value !== null);
+  const avgCheckInScore = weeklyMoodValues.length ? weeklyMoodValues.reduce((sum, score) => sum + score, 0) / weeklyMoodValues.length : null;
+  const moodLabelForAverage = (average: number | null) => average === null ? "No check-in" : average >= 3.5 ? "Energized" : average >= 2.5 ? "Good" : average >= 1.5 ? "Okay" : "Drained";
+  const moodDotsForAverage = (average: number | null) => average === null ? "○○○○" : `${"●".repeat(Math.round(average))}${"○".repeat(Math.max(0, 4 - Math.round(average)))}`;
+  const moodTrend = weeklyMoodValues.length >= 2 ? weeklyMoodValues[weeklyMoodValues.length - 1] - weeklyMoodValues[0] : 0;
+  const moodTrendText = weeklyMoodValues.length < 2 ? "not enough check-ins yet" : moodTrend > 0.25 ? "↗ improving throughout" : moodTrend < -0.25 ? "↘ declining throughout" : "→ holding steady";
+  const recoveryDays = new Set(recoveryBlocks.filter((block) => block.locked).map((block) => block.day.slice(0, 3)));
+  const drainedDays = last7Days.filter((day) => day.average !== null && day.average < 2.5);
+  const recoveryMoodValues = last7Days.filter((day) => day.average !== null && recoveryDays.has(day.dayLabel)).map((day) => day.average as number);
+  const nonRecoveryMoodValues = last7Days.filter((day) => day.average !== null && !recoveryDays.has(day.dayLabel)).map((day) => day.average as number);
+  const recoveryAverage = recoveryMoodValues.length ? recoveryMoodValues.reduce((sum, value) => sum + value, 0) / recoveryMoodValues.length : null;
+  const nonRecoveryAverage = nonRecoveryMoodValues.length ? nonRecoveryMoodValues.reduce((sum, value) => sum + value, 0) / nonRecoveryMoodValues.length : null;
+  const stressDays = last7Days.filter((day, index) => calculation.dailyMargins[index] < 5 && day.average !== null);
+  const moodRecoveryInsight = recoveryAverage !== null && nonRecoveryAverage !== null && recoveryAverage > nonRecoveryAverage + 0.2
+    ? "Your mood improves on days with protected recovery blocks. Consider protecting recovery before your tightest days."
+    : drainedDays.length && stressDays.length
+      ? `You felt drained on ${drainedDays.map((day) => day.dayLabel).join(" and ")}, which overlaps with tight-margin days. Consider protecting more recovery time there.`
+      : "Your mood pattern will become clearer as you log more checks alongside your recovery plan.";
+  const recoveryQualityLabel = avgCheckInScore === null ? null : avgCheckInScore < 2 ? "Needs attention" : avgCheckInScore < 3 ? "Moderate" : "Well restored";
   return <div className="reflection-page">
     <div className="screen-title-block"><h1>Week 36 Reflection</h1></div>
     <section className="card reflection-message-card">
@@ -1615,9 +1681,15 @@ function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, en
       </div>
     </section>
     {taskOutcomes.length > 0 && <p className="outcome-summary-line">Task outcomes this week: {outcomeCounts.Easy} Easy · {outcomeCounts.Fine} Fine · {outcomeCounts.Hard} Hard · {outcomeCounts.Disaster} Disaster</p>}
+    <section className="card weekly-mood-trend-card">
+      <span className="card-label">Your Weekly Mood Trend</span>
+      <div className="weekly-mood-list">{last7Days.map((day) => <div className="weekly-mood-row" key={day.dayLabel}><span className="weekly-mood-day">{day.date.toLocaleDateString("en-US", { weekday: "long" })}</span><span className="weekly-mood-dots">{moodDotsForAverage(day.average)}</span><span className="weekly-mood-score">{day.average === null ? "—" : day.average.toFixed(1)}</span><span className="weekly-mood-label">{moodLabelForAverage(day.average)}</span></div>)}</div>
+      <div className="weekly-mood-summary"><strong>Weekly avg: {avgCheckInScore === null ? "—" : avgCheckInScore.toFixed(1)}{avgCheckInScore !== null ? ` (${moodLabelForAverage(avgCheckInScore)})` : ""}</strong><span>Trend: {moodTrendText}</span></div>
+    </section>
     <section className="card stress-pattern">
       <span className="card-label">Stress Pattern</span>
-      <div className="stress-pattern-list">{last7Days.map((day) => { const moodEntry = day.moodValue ? { ...moodMeta(day.moodValue), label: day.moodValue as string } : null; const energyEntry = day.energyValue ? { ...energyMeta(day.energyValue), label: day.energyValue as string } : null; const entry = moodEntry ?? energyEntry; return <div className="stress-pattern-row" key={day.dayLabel}><span className="stress-pattern-day">{day.dayLabel}</span><span className="stress-pattern-value" style={entry ? { color: entry.color } : undefined}>{entry ? `${entry.emoji} ${entry.label}` : "No check-in"}</span></div>; })}</div>
+      <div className="stress-pattern-list">{last7Days.map((day) => <div className="stress-pattern-row" key={day.dayLabel}><span className="stress-pattern-day">{day.dayLabel}</span><span className="stress-pattern-value">{day.average === null ? "No check-in" : `${moodDotsForAverage(day.average)} ${day.average.toFixed(1)} · ${moodLabelForAverage(day.average)}`}</span></div>)}</div>
+      <p className="stress-pattern-insight">{moodRecoveryInsight}</p>
     </section>
     <section className="card reflection-insight-card">
       <div className="insight-row"><Moon size={16} /><span><strong>This week's goal</strong><small>Your hardest day: {DAYS[hardestIndex]}. Consider protecting {DAYS[hardestIndex]} evening.</small></span></div>
