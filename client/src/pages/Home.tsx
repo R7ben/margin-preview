@@ -639,7 +639,7 @@ function App() {
                 />
         ) : (
           <>
-            <Header screen={screen} onBack={() => navTo("dashboard")} />
+            <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} />
             <main className="page-wrap">
               {screen === "dashboard" && (
                 <Dashboard
@@ -775,9 +775,9 @@ function App() {
   );
 }
 
-function Header({ screen, onBack }: { screen: Screen; onBack: () => void }) {
+function Header({ screen, isDark, onBack }: { screen: Screen; isDark: boolean; onBack: () => void }) {
   return (
-    <header className="topbar topbar-dark">
+    <header className={`topbar ${isDark ? "topbar-dark" : "topbar-light"}`}>
       <div className="topbar-inner">
         <button className="hamburger-btn" aria-label="Menu" onClick={onBack}><Menu size={20} /></button>
         <div className="brand-lockup">
