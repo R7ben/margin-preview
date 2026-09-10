@@ -773,6 +773,13 @@ function App() {
             onAddAnywayOverride={addAnywayOverrideFromPreview}
           />
         )}
+        {screen === "mirror" && (
+          <div className="quick-check-fab-wrap">
+            <button className="quick-check-fab" aria-label="Can I afford this? Quick check" onClick={openQuickCheck}>
+              <MessageCircleQuestion size={22} />
+            </button>
+          </div>
+        )}
         {screen !== "onboarding" && screen !== "import" && screen !== "triage" && <BottomTabBar active={screen} onNavigate={navTo} />}
       </div>
       <NavDrawer open={drawerOpen} activeScreen={screen} onNavigate={(next) => { navTo(next); setDrawerOpen(false); }} onClose={() => setDrawerOpen(false)} />
