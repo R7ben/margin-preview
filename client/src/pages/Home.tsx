@@ -20,12 +20,13 @@ import {
   Clock3,
   Dumbbell,
   FileText,
-  Grid2X2,
   Info,
   Leaf,
   LockKeyhole,
+  Menu,
   MessageCircleQuestion,
   Moon,
+  PenLine,
   Plus,
   RotateCcw,
   Send,
@@ -34,6 +35,7 @@ import {
   Sparkles,
   Trash2,
   TriangleAlert,
+  Upload,
   Users,
   X,
   Brain,
@@ -90,8 +92,6 @@ type Suggestion = {
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const RING_CIRCUMFERENCE = 2 * Math.PI * 86;
 const MARK_URL = "/manus-storage/margin-mark_0f2827e1.png";
-const PAPER_URL = "/manus-storage/margin-paper-grain_ce180b60.png";
-const WEEK_LINES_URL = "/manus-storage/margin-week-lines_ab52177b.png";
 
 const initialFixedCommitments: FixedCommitment[] = [
   { id: 1, name: "Seminar", days: ["Tue", "Thu"], startTime: "10:00", endTime: "12:00", hours: 4 },
@@ -598,9 +598,11 @@ function App() {
     navTo("triage");
   };
 
+  const isDarkScreen = screen === "mirror" || screen === "triage" || screen === "planner" || screen === "reflection" || screen === "import";
+
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#2D2D2D]" style={{ backgroundImage: `url(${PAPER_URL})` }}>
-      <div className="mx-auto min-h-screen max-w-[1440px] border-x border-[#E0E0E0]/60 bg-[#F8F9FA]/95 shadow-[0_0_80px_rgba(27,73,101,0.04)]">
+    <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}`}>
+      <div className="app-frame">
         {screen === "onboarding" ? (
           <Onboarding
             sleepHours={sleepHours}
@@ -726,7 +728,6 @@ function App() {
                 />
               )}
             </main>
-            <BottomNav screen={screen} onNavigate={navTo} />
           </>
         )}
         {showQuickCheck && (
@@ -766,26 +767,17 @@ function App() {
 }
 
 function Header({ screen, onBack }: { screen: Screen; onBack: () => void }) {
-  const titles: Record<Exclude<Screen, "onboarding">, string> = {
-    dashboard: "Today",
-    mirror: "Commitment Mirror",
-    triage: "Triage",
-    planner: "Recovery Planner",
-    reflection: "Week 36 Reflection",
-    import: "Import Schedule",
-  };
   return (
-    <header className="topbar">
+    <header className="topbar topbar-dark">
       <div className="topbar-inner">
-        <div className="flex items-center gap-3">
-          {screen !== "dashboard" && <button className="icon-button icon-button-dark" aria-label="Back to dashboard" onClick={onBack}><ArrowLeft size={18} /></button>}
-          <div className="brand-lockup">
-            <img src={MARK_URL} alt="" className="brand-mark" />
-            <span className="brand-wordmark">MARGIN</span>
-          </div>
+        <button className="hamburger-btn" aria-label="Menu" onClick={onBack}><Menu size={20} /></button>
+        <div className="brand-lockup">
+          <img src={MARK_URL} alt="" className="brand-mark" />
+          <span className="brand-wordmark">MARGIN</span>
         </div>
-        <div className="topbar-meta"><span>{titles[screen as Exclude<Screen, "onboarding">]}</span><span className="topbar-rule" /><span className="hidden sm:inline">Recovery-first planning</span></div>
+        <span className="topbar-spacer" aria-hidden="true" />
       </div>
+      {screen !== "dashboard" && <button className="topbar-back" aria-label="Back to dashboard" onClick={onBack}><ArrowLeft size={14} /> Back</button>}
     </header>
   );
 }
@@ -816,64 +808,70 @@ function Onboarding(props: {
 }) {
   const { sleepHours, decompHours, fixedCommitments, availableCapacity, tier2Total, fixedTotal } = props;
   const capacityStatus = statusFor(availableCapacity);
+  const ONBOARD_RING_CIRC = 2 * Math.PI * 54;
   return (
     <>
-      <header className="topbar">
-        <div className="topbar-inner">
-          <div className="brand-lockup"><img src={MARK_URL} alt="" className="brand-mark" /><span className="brand-wordmark">MARGIN</span></div>
-          <div className="topbar-meta"><span className="hidden sm:inline">Recovery-first planning</span><span className="topbar-rule" /><span>Setup</span></div>
-        </div>
-      </header>
-      <main className="page-wrap onboarding-wrap">
-        <div className="onboarding-hero">
-          <div>
-            <p className="eyebrow">Recovery Floor Setup <span>01 / 06</span></p>
-            <h1 className="display-heading">Before your tasks.<br /><em>Set your limits.</em></h1>
-            <p className="lede">Margin protects your recovery first. Everything else fits around it.</p>
+        <header className="topbar topbar-light">
+          <div className="topbar-inner">
+            <span className="topbar-spacer" aria-hidden="true" />
+            <div className="brand-lockup"><img src={MARK_URL} alt="" className="brand-mark" /><span className="brand-wordmark">MARGIN</span></div>
+            <span className="topbar-spacer" aria-hidden="true" />
           </div>
-          <div className="onboarding-visual" aria-hidden="true">
-            <p className="visual-tagline">Recovery is infrastructure</p>
+        </header>
+        <main className="page-wrap onboarding-wrap">
+          <div className="onboarding-tagline">
+            <p>"Before your tasks, Set your limits"</p>
+            <span className="onboarding-subtagline">"Fuel first. Work second"</span>
           </div>
-        </div>
-        <div className="onboarding-layout">
-          <div className="space-y-6">
-            <section className="panel-section">
-              <div className="section-kicker"><span className="section-number">01</span><span>Recovery floor</span><span className="section-line" /></div>
-              <RangeCard icon={<Moon size={18} />} label="Minimum sleep per night" value={`${sleepHours} hrs`} note="Protected every night. Non-negotiable." min={4} max={12} step={0.5} inputValue={sleepHours} onChange={props.setSleepHours} />
-              <RangeCard icon={<Leaf size={18} />} label="Minimum daily decompression" value={`${decompHours} hr${decompHours === 1 ? "" : "s"}`} note="Screen-free wind-down, walks, anything that isn't work." min={0.5} max={4} step={0.5} inputValue={decompHours} onChange={props.setDecompHours} />
-            </section>
-            <section className="panel-section">
-              <div className="section-kicker"><span className="section-number">02</span><span>Fixed commitments</span><span className="section-line" /></div>
-              <div className="section-intro"><h2>Your fixed commitments</h2><p>Classes, work shifts, labs — things you cannot move.</p></div>
-              <div className="commitment-list">
-                {fixedCommitments.map((commitment) => (
-                  <div key={commitment.id} className="commitment-row">
-                    <div><strong>{commitment.name}</strong><span>{commitment.days.join(" · ")} · {commitment.startTime}–{commitment.endTime}</span></div>
-                    <div className="flex items-center gap-3"><span className="hours-chip">{formatShortHours(commitment.hours)}</span><button className="icon-button" aria-label={`Delete ${commitment.name}`} onClick={() => props.setFixedCommitments(fixedCommitments.filter((item) => item.id !== commitment.id))}><Trash2 size={16} /></button></div>
-                  </div>
-                ))}
+
+          <section className="card capacity-panel">
+            <div className="capacity-panel-top"><span className="card-label"><SlidersHorizontal size={12} /> Live calculation</span><button className="primary-button capacity-start-button" onClick={props.onStart}>Start Planning <ArrowRight size={15} /></button></div>
+            <div className="capacity-hero-row">
+              <div className="capacity-ring">
+                <svg className="capacity-ring-svg" viewBox="0 0 140 140">
+                  <circle className="capacity-ring-track" cx="70" cy="70" r="54" />
+                  <circle className="capacity-ring-fill" cx="70" cy="70" r="54" style={{ stroke: capacityStatus.color, strokeDasharray: ONBOARD_RING_CIRC, strokeDashoffset: ONBOARD_RING_CIRC * (1 - Math.max(0, Math.min(1, availableCapacity / 168))) }} />
+                </svg>
+                <div className="capacity-ring-center"><strong style={{ color: capacityStatus.color }}>{capacityPercent(availableCapacity)}%</strong><span>available</span></div>
               </div>
-              {props.showCommitmentForm ? (
-                <div className="inline-form">
-                  <label className="field-label">Commitment name<input className="text-input" placeholder="e.g. Lab shift" value={props.commitmentName} onChange={(event) => props.setCommitmentName(event.target.value)} /></label>
-                  <div><span className="field-label">Days</span><div className="day-picker">{DAYS.map((day) => <button key={day} className={`day-toggle ${props.commitmentDays.includes(day) ? "day-toggle-active" : ""}`} onClick={() => props.setCommitmentDays(props.commitmentDays.includes(day) ? props.commitmentDays.filter((item) => item !== day) : [...props.commitmentDays, day])}>{day}</button>)}</div></div>
-                  <div className="grid grid-cols-2 gap-3"><label className="field-label">Start time<input type="time" className="text-input" value={props.commitmentStart} onChange={(event) => props.setCommitmentStart(event.target.value)} /></label><label className="field-label">End time<input type="time" className="text-input" value={props.commitmentEnd} onChange={(event) => props.setCommitmentEnd(event.target.value)} /></label></div>
-                  <div className="form-actions"><button className="secondary-button" onClick={() => props.setShowCommitmentForm(false)}>Cancel</button><button className="primary-button" onClick={props.saveCommitment}>Save commitment</button></div>
+              <div className="capacity-hero-stat">
+                <span className="capacity-number">{formatHours(availableCapacity)}</span>
+                <span className="capacity-state" style={{ color: capacityStatus.color }}><span className="status-dot" style={{ background: capacityStatus.color }} />{capacityStatus.label}</span>
+              </div>
+            </div>
+            <div className="math-list"><div><span>Total hours</span><span>168 hrs</span></div><div><span>Recovery Floor</span><span>{formatHours(tier2Total)}</span></div><div><span>Fixed commitments</span><span>{formatHours(fixedTotal)}</span></div><div className="math-result"><span>Available</span><span>{formatHours(availableCapacity)}</span></div></div>
+          </section>
+
+          <section className="card">
+            <div className="section-kicker"><Moon size={14} /><span>Recovery Floor</span></div>
+            <p className="section-caption">Your non-negotiable baseline for rest</p>
+            <RangeCard icon={<Moon size={18} />} label="Minimum sleep per night" value={`${sleepHours} hrs`} note="Protected every night. Non-negotiable." min={4} max={12} step={0.5} inputValue={sleepHours} onChange={props.setSleepHours} />
+            <RangeCard icon={<Leaf size={18} />} label="Minimum daily decompression" value={`${decompHours} hr${decompHours === 1 ? "" : "s"}`} note="Screen-free wind-down, walks, anything that isn't work." min={0.5} max={4} step={0.5} inputValue={decompHours} onChange={props.setDecompHours} />
+          </section>
+
+          <section className="card">
+            <div className="section-kicker"><CalendarDays size={14} /><span>Fix Commitments</span></div>
+            <p className="section-caption">Your non-negotiable schedule</p>
+            <div className="commitment-list">
+              {fixedCommitments.map((commitment) => (
+                <div key={commitment.id} className="commitment-row">
+                  <div><strong>{commitment.name}</strong><span>{commitment.days.join(" · ")} · {commitment.startTime}–{commitment.endTime}</span></div>
+                  <div className="flex items-center gap-3"><span className="hours-chip">{formatShortHours(commitment.hours)}</span><button className="icon-button" aria-label={`Delete ${commitment.name}`} onClick={() => props.setFixedCommitments(fixedCommitments.filter((item) => item.id !== commitment.id))}><Trash2 size={16} /></button></div>
                 </div>
-              ) : <div className="setup-actions"><button className="text-action" onClick={() => props.setShowCommitmentForm(true)}><Plus size={16} /> Add Commitment</button><button className="text-action" onClick={props.onImport}><CalendarDays size={16} /> Import Schedule</button></div>}
-            </section>
-          </div>
-          <aside className="capacity-panel">
-            <div className="capacity-panel-top"><span className="eyebrow">Live calculation</span><span className="capacity-state" style={{ color: capacityStatus.color }}><span className="status-dot" style={{ background: capacityStatus.color }} />{capacityStatus.label}</span></div>
-            <h2>Available Capacity <span>this week</span></h2>
-            <div className="capacity-number" style={{ color: capacityStatus.color }}>{capacityPercent(availableCapacity)}% available</div>
-            <p className="capacity-number-secondary">{formatHours(availableCapacity)}</p>
-            <div className="math-list"><div><span>168 hrs total</span><span>168 hrs</span></div><div><span>− Recovery Floor</span><span>− {formatHours(tier2Total)}</span></div><div><span>− Fixed commitments</span><span>− {formatHours(fixedTotal)}</span></div><div className="math-result"><span>= Available</span><span>{formatHours(availableCapacity)}</span></div></div>
-            <p className="small-note">Tasks come next. This is the room they will compete for.</p>
-            <button className="primary-button primary-button-wide" onClick={props.onStart}>Start Planning <ArrowRight size={17} /></button>
-          </aside>
-        </div>
-      </main>
+              ))}
+            </div>
+            {props.showCommitmentForm ? (
+              <div className="inline-form">
+                <label className="field-label">Commitment name<input className="text-input" placeholder="e.g. Lab shift" value={props.commitmentName} onChange={(event) => props.setCommitmentName(event.target.value)} /></label>
+                <div><span className="field-label">Days</span><div className="day-picker">{DAYS.map((day) => <button key={day} className={`day-toggle ${props.commitmentDays.includes(day) ? "day-toggle-active" : ""}`} onClick={() => props.setCommitmentDays(props.commitmentDays.includes(day) ? props.commitmentDays.filter((item) => item !== day) : [...props.commitmentDays, day])}>{day}</button>)}</div></div>
+                <div className="grid grid-cols-2 gap-3"><label className="field-label">Start time<input type="time" className="text-input" value={props.commitmentStart} onChange={(event) => props.setCommitmentStart(event.target.value)} /></label><label className="field-label">End time<input type="time" className="text-input" value={props.commitmentEnd} onChange={(event) => props.setCommitmentEnd(event.target.value)} /></label></div>
+                <div className="form-actions"><button className="secondary-button" onClick={() => props.setShowCommitmentForm(false)}>Cancel</button><button className="primary-button" onClick={props.saveCommitment}>Save commitment</button></div>
+              </div>
+            ) : <button className="add-commitment-row" onClick={() => props.setShowCommitmentForm(true)}><Plus size={16} /> Add Commitment</button>}
+          </section>
+
+          <button className="primary-button" onClick={props.onImport}><CalendarDays size={17} /> Import Schedule</button>
+        </main>
     </>
   );
 }
@@ -913,44 +911,44 @@ function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, show
     if (pendingOutcomeId === task.id) return <div className="task-row" key={task.id}><div className="outcome-feedback-row"><span>{task.name} — how did it go?</span><div className="outcome-emoji-group">{outcomeEmojis.map((item) => <button key={item.value} className="outcome-emoji-button" aria-label={item.value} onClick={() => { onRecordOutcome(task, item.value); setPendingOutcomeId(null); }}>{item.icon}</button>)}</div></div></div>;
     return <div className="task-row" key={task.id}><div className="task-leading">{tag && <span className={`lock-in-tag lock-in-tag-${tag.toLowerCase().replace(/[^a-z]/g, "")}`}>{tag}</span>}<div className={`task-icon task-icon-${task.category}`}><Icon size={15} /></div><div><strong>{task.name}</strong><span>{formatHours(task.estimatedHours)} · {categoryLabel(task.category)} load · due {task.deadline}</span></div></div><button className="icon-button" aria-label={`Delete ${task.name}`} onClick={() => requestDelete(task.id)}><Trash2 size={16} /></button></div>;
   };
+  const moodPillTone: Record<MoodValue, string> = { Drained: "pill-negative", Okay: "pill-neutral", Good: "pill-neutral", Energized: "pill-positive" };
+  const energyPillTone: Record<EnergyResponse, string> = { Rough: "pill-negative", Okay: "pill-neutral", Ready: "pill-positive" };
+  const totalCategoryHours = Object.values(calculation.categoryBreakdown).reduce((sum, value) => sum + value, 0);
+  const maxDailyMargin = Math.max(...calculation.dailyMargins, 1);
   return <div className="dashboard-page">
-    {showMorningCheckIn && <section className="morning-checkin-card"><span className="card-label">How are you feeling today?</span><div className="morning-checkin-actions">{MOOD_OPTIONS.map((option) => <button key={option.value} className="secondary-button" onClick={() => onMorningCheckInRespond(option.value)}>{option.emoji} {option.value}</button>)}</div></section>}
+    {showMorningCheckIn && <section className="card checkin-card"><span className="card-label">How do you feel today?</span><div className="pill-row">{MOOD_OPTIONS.map((option) => <button key={option.value} className={`pill pill-button ${moodPillTone[option.value]}`} onClick={() => onMorningCheckInRespond(option.value)}>{option.value}</button>)}</div></section>}
     {recoveryQualityBlock && !recoveryQualityDismissed && <RecoveryQualityCard block={recoveryQualityBlock} onSelect={onRecoveryQuality} />}
-    {showEnergyCheckIn && <section className="energy-checkin-card"><span className="card-label">Heading into today...</span><div className="energy-checkin-actions"><button className="secondary-button" onClick={() => onEnergyRespond("Rough")}>😮‍💨 Rough</button><button className="secondary-button" onClick={() => onEnergyRespond("Okay")}>😐 Okay</button><button className="secondary-button" onClick={() => onEnergyRespond("Ready")}>💪 Ready</button></div></section>}
-    <div className="dashboard-intro"><div><p className="eyebrow">Today <span>Week 36</span></p><h1 className="page-heading">Your week, with recovery in view.</h1></div><button className="quiet-button" onClick={onReflection}><BarChart3 size={16} /> Weekly Reflection</button></div>
-    <div className="dashboard-grid">
-      <section className="hero-margin-card">
-        <div className="hero-card-head"><span className="card-label">Recovery Margin</span><div className="status-pill" style={{ color: status.color, borderColor: `${status.color}44`, background: `${status.color}10` }}><span className="status-dot" style={{ background: status.color }} />{status.label}</div></div>
-        <div className="progress-ring-wrap">
-          <svg className="progress-ring-svg" viewBox="0 0 200 200">
-            <circle className="progress-ring-track" cx="100" cy="100" r="86" />
-            <circle className="progress-ring-fill" cx="100" cy="100" r="86" style={{ stroke: status.color, strokeDasharray: RING_CIRCUMFERENCE, strokeDashoffset: RING_CIRCUMFERENCE * (1 - Math.max(0, Math.min(1, calculation.margin / scale))) }} />
-          </svg>
-          <div className="progress-ring-center">
-            <div className="margin-number" style={{ color: status.color }}>{capacityPercent(calculation.margin)}%</div>
-            <p className="margin-hours-secondary">{formatHours(calculation.margin)} available</p>
-            <span className="trend-copy"><span className="trend-arrow">{calculation.flexTotal > 0 ? "↓" : "→"}</span> {calculation.flexTotal > 0 ? "Shrinking" : "Holding"}</span>
-          </div>
+    {showEnergyCheckIn && <section className="card checkin-card"><span className="card-label">Heading into today...</span><div className="pill-row"><button className="pill pill-button pill-negative" onClick={() => onEnergyRespond("Rough")}>Rough</button><button className="pill pill-button pill-neutral" onClick={() => onEnergyRespond("Okay")}>Okay</button><button className="pill pill-button pill-positive" onClick={() => onEnergyRespond("Ready")}>Ready</button></div></section>}
+    <div className="dashboard-intro"><p className="eyebrow">Your week</p><h1 className="page-heading">Your Week</h1><p className="dashboard-subtitle">With recovery view</p><button className="text-action dashboard-reflection-link" onClick={onReflection}><BarChart3 size={14} /> Weekly Reflection</button></div>
+    <section className="card hero-margin-card">
+      <div className="hero-card-head"><span className="card-label">Recovery Margin</span><div className="status-pill" style={{ color: status.color, borderColor: `${status.color}44`, background: `${status.color}10` }}><span className="status-dot" style={{ background: status.color }} />{status.label}</div></div>
+      <div className="progress-ring-wrap">
+        <svg className="progress-ring-svg" viewBox="0 0 200 200">
+          <circle className="progress-ring-track" cx="100" cy="100" r="86" />
+          <circle className="progress-ring-fill" cx="100" cy="100" r="86" style={{ stroke: status.color, strokeDasharray: RING_CIRCUMFERENCE, strokeDashoffset: RING_CIRCUMFERENCE * (1 - Math.max(0, Math.min(1, calculation.margin / scale))) }} />
+        </svg>
+        <div className="progress-ring-center">
+          <div className="margin-number" style={{ color: status.color }}>{capacityPercent(calculation.margin)}%</div>
+          <p className="margin-hours-secondary">{formatHours(calculation.margin)} available</p>
+          <span className="trend-copy"><span className="trend-arrow">{calculation.flexTotal > 0 ? "↓" : "→"}</span> {calculation.flexTotal > 0 ? "Shrinking" : "Holding"}</span>
         </div>
-        <p className="hero-substat">{headline}{showRiskLine ? ` Your week has room. ${lowestDay} doesn't.` : ""}</p>
-        <div className="margin-footer"><span>{status.copy}</span><span className="trend-copy"><small>{calculation.flexTotal > 0 ? `was ${formatHours(calculation.margin + calculation.flexTotal)} before flexible commitments` : "no flexible commitments are using the margin"}</small></span></div>
-        {calculation.distributionWarning && <div className="distribution-warning"><TriangleAlert size={16} /> Recovery concentrated later in the week</div>}
-        {calculation.margin <= 0 && <button className="triage-callout" onClick={onTriage}><TriangleAlert size={17} /> Recovery deficit detected <ArrowRight size={16} /></button>}
-      </section>
-      <aside className="week-side-rail">
-        <div className="side-rail-label">The week at a glance</div>
-        <div className="day-dots">{DAYS.map((day, index) => { const dayStatus = dailyStatusFor(calculation.dailyMargins[index]); return <div key={day} className="day-dot-item"><span className="day-name">{day}</span><span className="day-dot" style={{ background: dayStatus.color }} title={`${day}: ${dayStatus.label}`} /><span className="day-margin">{formatShortHours(calculation.dailyMargins[index])}</span></div>; })}</div>
-        <img src={WEEK_LINES_URL} alt="" className="week-lines" />
-        <p className="side-note">Daily dots include your Recovery Floor, fixed load, and deadline-weighted tasks.</p>
-      </aside>
-    </div>
-    <section className="category-breakdown-card">
+      </div>
+      <p className="hero-substat">{headline}{showRiskLine ? ` Your week has room. ${lowestDay} doesn't.` : ""}</p>
+      <div className="margin-footer"><span>{status.copy}</span><span className="trend-copy"><small>{calculation.flexTotal > 0 ? `was ${formatHours(calculation.margin + calculation.flexTotal)} before flexible commitments` : "no flexible commitments are using the margin"}</small></span></div>
+      {calculation.distributionWarning && <div className="distribution-warning"><TriangleAlert size={16} /> Recovery concentrated later in the week</div>}
+      {calculation.margin <= 0 && <button className="triage-callout" onClick={onTriage}><TriangleAlert size={17} /> Recovery deficit detected <ArrowRight size={16} /></button>}
+    </section>
+    <section className="card week-glance-card">
+      <span className="card-label">Week at Glance</span>
+      <div className="week-glance-list">{DAYS.map((day, index) => { const dayStatus = dailyStatusFor(calculation.dailyMargins[index]); const width = Math.max(8, Math.min(100, (calculation.dailyMargins[index] / maxDailyMargin) * 100)); return <div key={day} className="week-glance-row"><span className="week-glance-day">{day}</span><span className="week-glance-track"><span className="week-glance-fill" style={{ width: `${width}%`, background: dayStatus.color }} title={`${day}: ${dayStatus.label} · ${formatShortHours(calculation.dailyMargins[index])}`} /></span></div>; })}</div>
+      <p className="side-note">Bars include your Recovery Floor, fixed load, and deadline-weighted tasks.</p>
+    </section>
+    <section className="card category-breakdown-card">
       <span className="card-label">Available Capacity by Category</span>
       <div className="category-breakdown-bar">
         {CATEGORY_BREAKDOWN_ITEMS.map((item) => {
           const hours = calculation.categoryBreakdown[item.key];
-          const total = Object.values(calculation.categoryBreakdown).reduce((sum, value) => sum + value, 0);
-          const width = total > 0 ? (hours / total) * 100 : 0;
+          const width = totalCategoryHours > 0 ? (hours / totalCategoryHours) * 100 : 0;
           return width > 0 ? <div key={item.key} className="category-breakdown-segment" style={{ width: `${width}%`, background: item.color }} title={`${item.label}: ${formatHours(hours)}`} /> : null;
         })}
       </div>
@@ -959,8 +957,8 @@ function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, show
       </div>
     </section>
     {!showFullWeek ? (
-      <section className="tasks-panel lock-in-panel">
-        <div className="tasks-head"><div><span className="card-label">Today's Lock In</span><p className="card-subtitle">The three things that matter most today.</p></div><button className="text-action" onClick={() => setShowFullWeek(true)}>Show full week →</button></div>
+      <section className="card tasks-panel lock-in-panel">
+        <div className="tasks-head"><div><span className="card-label">Today's Lock In</span><p className="card-subtitle">Things that matter most</p></div></div>
         <div className="task-list">
           {mustDo ? renderTaskRow(mustDo, "Must-do") : <div className="empty-state"><FileText size={19} /><span>No must-do task right now.</span></div>}
           {maintenance ? renderTaskRow(maintenance, "Maintenance") : <div className="empty-state"><FileText size={19} /><span>No maintenance task right now.</span></div>}
@@ -969,16 +967,20 @@ function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, show
       </section>
     ) : (
       <>
-        <section className="load-panel"><div className="load-panel-head"><div><span className="card-label">How the week is allocated</span><p className="card-subtitle">Recovery stays first. Obligations use what remains.</p></div><button className="text-action" onClick={onPlanner}><Leaf size={16} /> Open planner</button></div><div className="telemetry-grid">{[
+        <section className="card load-panel"><div className="load-panel-head"><div><span className="card-label">How the week is allocated</span><p className="card-subtitle">Recovery stays first. Obligations use what remains.</p></div><button className="text-action" onClick={onPlanner}><Leaf size={16} /> Open planner</button></div><div className="telemetry-grid">{[
           { label: "Recovery Floor", value: calculation.tier2Total, good: true },
           { label: "Fixed Load", value: calculation.fixedTotal, good: calculation.fixedTotal <= calculation.availableCapacity },
           { label: "Flex Tasks", value: calculation.flexTotal, good: calculation.flexTotal <= calculation.margin + calculation.flexTotal },
           { label: "Recovery Margin", value: Math.max(calculation.margin, 0), good: calculation.margin >= 5 },
         ].map((item) => <div className="telemetry-card" key={item.label}><span className="telemetry-label">{item.label} {item.good && <CircleCheck size={12} />}</span><strong className="telemetry-value">{formatHours(item.value)}</strong></div>)}</div></section>
-        <section className="tasks-panel"><div className="tasks-head"><div><span className="card-label">Flexible commitments</span><p className="card-subtitle">These compete for the margin. They can be deferred in Triage.</p></div><span className="task-count">{activeTasks.length} active</span></div>{activeTasks.length ? <div className="task-list">{activeTasks.map((task) => renderTaskRow(task))}</div> : <div className="empty-state"><FileText size={19} /><span>No flexible tasks yet. Add one to see its cost.</span></div>}<button className="text-action" onClick={() => setShowFullWeek(false)}>← Back to Lock In</button></section>
+        <section className="card tasks-panel"><div className="tasks-head"><div><span className="card-label">Flexible commitments</span><p className="card-subtitle">These compete for the margin. They can be deferred in Triage.</p></div><span className="task-count">{activeTasks.length} active</span></div>{activeTasks.length ? <div className="task-list">{activeTasks.map((task) => renderTaskRow(task))}</div> : <div className="empty-state"><FileText size={19} /><span>No flexible tasks yet. Add one to see its cost.</span></div>}<button className="text-action" onClick={() => setShowFullWeek(false)}>← Back to Lock In</button></section>
       </>
     )}
-    <div className="dashboard-actions"><button className="primary-button" onClick={onAddTask}><Plus size={18} /> Add Task</button><button className="secondary-button" onClick={onPlanner}><Leaf size={17} /> Recovery Planner</button></div>
+    <div className="dashboard-actions">
+      {!showFullWeek ? <button className="secondary-button" onClick={() => setShowFullWeek(true)}>Show Full Week</button> : <button className="secondary-button" onClick={() => setShowFullWeek(false)}>← Back to Lock In</button>}
+      <button className="primary-button" onClick={onAddTask}><Plus size={18} /> Add Task</button>
+      <button className="secondary-button" onClick={onPlanner}><Leaf size={17} /> Recovery Planner</button>
+    </div>
     <button className="quick-check-fab" onClick={onQuickCheck}><MessageCircleQuestion size={18} /> <span>Can I afford this?</span></button>
   </div>;
 }
@@ -989,13 +991,58 @@ const useCalculationShape = null as unknown as () => CalculationShape;
 
 function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargin, projectedStatus, consequenceDay, dailyBreachAmount, sleepImpact, predictedHighLoadDays, showActions, confirmBreach, setDraftName, setDraftHours, setDraftDeadline, setShowActions, onAddAnyway, onTriage, onSplit, onFindSlot, onDefer }: { draftName: string; draftHours: number; draftDeadline: string; projectedMargin: number; projectedStatus: ReturnType<typeof statusFor>; consequenceDay: string; dailyBreachAmount: number; sleepImpact: number; predictedHighLoadDays: number; showActions: boolean; confirmBreach: boolean; setDraftName: (value: string) => void; setDraftHours: (value: number) => void; setDraftDeadline: (value: string) => void; setShowActions: (value: boolean) => void; onAddAnyway: () => void; onTriage: () => void; onSplit: () => void; onFindSlot: () => void; onDefer: () => void }) {
   const stageTwo = projectedMargin < 0;
+  const TRADE_RING_CIRC = 2 * Math.PI * 54;
+  const beforePercent = capacityPercent(projectedMargin + draftHours);
+  const afterPercent = capacityPercent(projectedMargin);
+  const beforeStage = statusFor(projectedMargin + draftHours);
   return <div className="mirror-page">
-    <div className="screen-header"><div><p className="eyebrow">Commitment Mirror <span>See the cost before you say yes</span></p><h1 className="page-heading">What do you need to do?</h1></div><div className="screen-index">03 / 06</div></div>
-    <div className="mirror-layout">
-      <section className="mirror-input-panel panel-section"><div className="section-kicker"><span className="section-number">01</span><span>Input</span><span className="section-line" /></div><div className="quick-add-chips">{QUICK_ADD_PRESETS.map((preset) => <button key={preset.name} type="button" className="quick-add-chip" onClick={() => { setDraftName(preset.name); setDraftHours(preset.hours); }}>{preset.name} · {formatShortHours(preset.hours)} · {preset.displayCategory}</button>)}</div><label className="field-label large-label">Task or commitment<input autoFocus className="task-input" placeholder="What do you need to do?" value={draftName} onChange={(event) => setDraftName(event.target.value)} /></label><label className="field-label estimate-label">Your estimate<input className="number-input" type="number" min="0.5" step="0.5" value={draftHours} onChange={(event) => setDraftHours(Number(event.target.value))} /><span className="input-suffix">hrs</span></label><label className="field-label">Deadline<select className="text-input" value={draftDeadline} onChange={(event) => setDraftDeadline(event.target.value)}>{DAYS.map((day) => <option key={day} value={day}>{day}</option>)}</select></label><p className="input-note"><Info size={15} /> The estimate is yours. The engine uses it as entered.</p></section>
-      <section className={`cost-panel ${stageTwo ? "cost-panel-breached" : ""}`}><div className="cost-panel-label"><span>02</span><span>What accepting this costs you:</span><span className="cost-line" /></div><div className="cost-hero-label">Recovery Margin</div><div className="cost-hero-number"><span>{capacityPercent(projectedMargin + draftHours)}%</span><ArrowRight size={23} /><span style={{ color: projectedStatus.color }}>{capacityPercent(projectedMargin)}%</span></div><div className="cost-hero-subvalue"><span>{formatHours(projectedMargin + draftHours)}</span><ArrowRight size={14} /><span>{formatHours(projectedMargin)}</span></div><div className="cost-hero-caption"><span>current</span><span>after accepting</span></div><div className="consequence-list">{sleepImpact > 0 && <div className="consequence consequence-major"><Moon size={20} /><span><strong>{consequenceDay} sleep</strong><small>{formatShortHours(7)} → {formatShortHours(Math.max(0, 7 - sleepImpact))}</small></span></div>}{predictedHighLoadDays >= 3 && <div className="consequence"><TriangleAlert size={19} /><span><strong>{predictedHighLoadDays} consecutive high-load days ahead</strong><small>Task load concentrates around your existing commitments.</small></span></div>}{stageTwo && <div className="consequence"><ShieldCheck size={19} /><span><strong>Recovery floor breached by {formatHours(dailyBreachAmount || Math.abs(projectedMargin))} on {consequenceDay}</strong><small>The protected floor is the first thing this schedule would cut.</small></span></div>}{sleepImpact > 0 ? <p className="why-line">Why? This task overlaps your protected recovery window on {consequenceDay}.</p> : <p className="why-line">Why? This task uses {formatHours(draftHours)} of the margin currently available.</p>}</div><div className="risk-row"><span className="risk-label">Risk</span><span className="risk-state" style={{ color: projectedStatus.color, borderColor: `${projectedStatus.color}55`, background: `${projectedStatus.color}10` }}>{stageTwo ? "HIGH" : projectedMargin <= 5 ? "MEDIUM" : "LOW"}</span></div>{stageTwo && <button className="triage-callout triage-callout-light" onClick={onTriage}><TriangleAlert size={17} /> Triage becomes the clearest next option <ArrowRight size={16} /></button>}</section>
-    </div>
-    <section className="mirror-actions"><button className="collapse-action" onClick={() => setShowActions(!showActions)}>{showActions ? "Hide options" : "See options"}<ChevronDown size={17} className={showActions ? "rotate-180" : ""} /></button>{showActions && <div className="action-grid"><button className={`action-button ${stageTwo ? "action-button-danger" : ""}`} onClick={onAddAnyway}>{stageTwo && confirmBreach ? "I understand this breaches my recovery floor" : "Add Anyway"}<ArrowRight size={16} /></button><button className="action-button" onClick={onSplit}>Split Into 2 × {formatShortHours(Math.max(0.5, draftHours / 2))}<SlidersHorizontal size={16} /></button><button className="action-button" onClick={onFindSlot}>Find a Slot<CalendarDays size={16} /></button><button className="action-button" onClick={onDefer}>Defer Something First<RotateCcw size={16} /></button></div>}</section>
+    <section className="card mirror-tradeoff-card">
+      <div className="section-kicker"><SlidersHorizontal size={14} /><span>Trade Off</span></div>
+      <div className="trade-ring-row">
+        <div className="trade-ring">
+          <svg className="trade-ring-svg" viewBox="0 0 140 140">
+            <circle className="trade-ring-track" cx="70" cy="70" r="54" />
+            <circle className="trade-ring-fill" cx="70" cy="70" r="54" style={{ stroke: beforeStage.color, strokeDasharray: TRADE_RING_CIRC, strokeDashoffset: TRADE_RING_CIRC * (1 - Math.max(0, Math.min(1, beforePercent / 100))) }} />
+          </svg>
+          <span className="trade-ring-value" style={{ color: beforeStage.color }}>{beforePercent}%</span>
+        </div>
+        <ArrowRight size={20} className="trade-ring-arrow" />
+        <div className="trade-ring">
+          <svg className="trade-ring-svg" viewBox="0 0 140 140">
+            <circle className="trade-ring-track" cx="70" cy="70" r="54" />
+            <circle className="trade-ring-fill" cx="70" cy="70" r="54" style={{ stroke: projectedStatus.color, strokeDasharray: TRADE_RING_CIRC, strokeDashoffset: TRADE_RING_CIRC * (1 - Math.max(0, Math.min(1, afterPercent / 100))) }} />
+          </svg>
+          <span className="trade-ring-value" style={{ color: projectedStatus.color }}>{afterPercent}%</span>
+        </div>
+      </div>
+      <div className="trade-hours-row"><strong>{formatHours(projectedMargin + draftHours)}</strong><ArrowRight size={15} /><strong style={{ color: projectedStatus.color }}>{formatHours(projectedMargin)}</strong></div>
+      <p className="trade-caption">Recovery Margin</p>
+      <div className="why-row"><Info size={15} /><p>{sleepImpact > 0 ? `This task overlaps your protected recovery window on ${consequenceDay}.` : `This task uses ${formatHours(draftHours)} of the margin currently available.`}</p></div>
+      {sleepImpact > 0 && <div className="consequence consequence-major"><Moon size={20} /><span><strong>{consequenceDay} sleep</strong><small>{formatShortHours(7)} → {formatShortHours(Math.max(0, 7 - sleepImpact))}</small></span></div>}
+      {predictedHighLoadDays >= 3 && <div className="consequence"><TriangleAlert size={19} /><span><strong>{predictedHighLoadDays} consecutive high-load days ahead</strong><small>Task load concentrates around your existing commitments.</small></span></div>}
+      {stageTwo && <div className="consequence"><ShieldCheck size={19} /><span><strong>Recovery floor breached by {formatHours(dailyBreachAmount || Math.abs(projectedMargin))} on {consequenceDay}</strong><small>The protected floor is the first thing this schedule would cut.</small></span></div>}
+      {stageTwo && <button className="triage-callout triage-callout-light" onClick={onTriage}><TriangleAlert size={17} /> Triage becomes the clearest next option <ArrowRight size={16} /></button>}
+    </section>
+
+    <section className="card mirror-input-card">
+      <div className="section-kicker"><span>Input</span></div>
+      <div className="quick-add-grid">{QUICK_ADD_PRESETS.map((preset) => { const Icon = categoryIcon(suggestionFor(preset.name).category); return <button key={preset.name} type="button" className="quick-add-tile" onClick={() => { setDraftName(preset.name); setDraftHours(preset.hours); }}><Icon size={15} /><span><strong>{preset.name}</strong><small>{formatShortHours(preset.hours)} · {preset.displayCategory}</small></span></button>; })}</div>
+      <label className="field-label">Other task/commitment?<input autoFocus className="task-input" placeholder="Type here..." value={draftName} onChange={(event) => setDraftName(event.target.value)} /></label>
+      <div className="mirror-field-row">
+        <label className="field-label">Est time<input className="number-input" type="number" min="0.5" step="0.5" value={draftHours} onChange={(event) => setDraftHours(Number(event.target.value))} /></label>
+        <label className="field-label">Day<select className="text-input" value={draftDeadline} onChange={(event) => setDraftDeadline(event.target.value)}>{DAYS.map((day) => <option key={day} value={day}>{day}</option>)}</select></label>
+      </div>
+      <button className={`primary-button ${stageTwo ? "primary-button-danger" : ""}`} onClick={onAddAnyway}>{stageTwo && confirmBreach ? "I understand this breaches my recovery floor" : "Add Task"} <ArrowRight size={16} /></button>
+    </section>
+
+    <section className="card mirror-easier-card">
+      <span className="card-label">Easier options?</span>
+      <div className="button-stack">
+        <button className="option-pill option-pill-teal" onClick={onSplit}><SlidersHorizontal size={15} /> Split into 2 × {formatShortHours(Math.max(0.5, draftHours / 2))}</button>
+        <button className="option-pill option-pill-blue" onClick={onDefer}><RotateCcw size={15} /> Defer something first</button>
+        <button className="option-pill option-pill-blue2" onClick={onFindSlot}><CalendarDays size={15} /> Find a slot</button>
+      </div>
+    </section>
     <div className="agency-note"><ShieldCheck size={17} /><span>There is no hard lock. The choice remains yours, with the cost visible.</span></div>
   </div>;
 }
@@ -1015,7 +1062,44 @@ function RecoveryQualityCard({ block, onSelect }: { block: RecoveryBlock; onSele
 }
 
 function ImportCommitments({ fileName, reviewed, onFile, onContinue, onApprove, onManual }: { fileName: string; reviewed: boolean; onFile: (name: string) => void; onContinue: () => void; onApprove: () => void; onManual: () => void }) {
-  return <div className="import-page"><div className="screen-header"><div><p className="eyebrow">Fixed commitments <span>02 / 06</span></p><h1 className="page-heading">Import Schedule</h1><p className="lede compact">Bring in the things that cannot move. Margin will keep them ahead of tasks.</p></div><CalendarDays size={28} className="screen-mark" /></div>{reviewed ? <section className="import-review panel-section"><div className="section-kicker"><span className="section-number">02</span><span>Confirm fixed load</span><span className="section-line" /></div><div className="import-file-chip"><Check size={16} /> {fileName || "Sample university timetable"}</div><p className="import-note">These classes will be added as Fixed Load before you approve them.</p><div className="import-class-list">{IMPORTED_TIMETABLE.map((item) => <div className="commitment-row" key={item.id}><div><strong>{item.name}</strong><span>{item.days.join(" · ")} · {item.startTime}–{item.endTime}</span></div><span className="hours-chip">{formatShortHours(item.hours)}</span></div>)}</div><div className="form-actions"><button className="secondary-button" onClick={() => onFile("")}>Choose another file</button><button className="primary-button" onClick={onApprove}>Approve Fixed Load <ArrowRight size={17} /></button></div></section> : <section className="import-options panel-section"><div className="section-kicker"><span className="section-number">01</span><span>Choose a source</span><span className="section-line" /></div><label className="import-option"><input type="radio" checked={!fileName} readOnly /><span><strong>Upload university timetable</strong><small>PDF, CSV, or image · parsed locally for this prototype</small></span><input className="file-input" type="file" accept=".pdf,.csv,image/*" onChange={(event) => onFile(event.target.files?.[0]?.name ?? "")} /></label><div className="import-option import-option-disabled"><input type="radio" checked={false} readOnly /><span><strong>Import calendar</strong><small>Future build · OAuth and parsing are not enabled here.</small></span><span className="future-label">Future build</span></div><div className="import-sample"><button className="text-action" onClick={() => onFile("Sample university timetable.pdf")}><BookOpen size={16} /> Use sample timetable for preview</button><span>{fileName || "No timetable selected yet"}</span></div><div className="form-actions"><button className="secondary-button" onClick={onManual}>Enter manually instead</button><button className="primary-button" onClick={onContinue}>Continue <ArrowRight size={17} /></button></div><p className="feasibility-note">Parsing and OAuth are finalist-phase builds. Manual entry remains the MVP fallback.</p></section>}</div>;
+  return <div className="import-page">
+    <div className="screen-title-block"><h1>Import Schedule</h1></div>
+    {reviewed ? (
+      <section className="card import-card">
+        <div className="section-kicker"><CalendarDays size={14} /><span>Confirm fixed load</span></div>
+        <div className="import-file-chip"><Check size={16} /> {fileName || "Sample university timetable"}</div>
+        <p className="import-note">These classes will be added as Fixed Load before you approve them.</p>
+        <div className="import-class-list">{IMPORTED_TIMETABLE.map((item) => <div className="commitment-row" key={item.id}><div><strong>{item.name}</strong><span>{item.days.join(" · ")} · {item.startTime}–{item.endTime}</span></div><span className="hours-chip">{formatShortHours(item.hours)}</span></div>)}</div>
+        <button className="secondary-button import-back-button" onClick={() => onFile("")}>Choose another file</button>
+      </section>
+    ) : (
+      <section className="card import-card">
+        <div className="section-kicker"><Upload size={14} /><span>Choose a source</span></div>
+        <div className="import-source-group">
+          <span className="import-source-label"><Upload size={14} /> Upload timetable</span>
+          <label className="import-source-button">
+            <Upload size={15} /> Upload Timetable
+            <input className="file-input" type="file" accept=".pdf,.csv,image/*" onChange={(event) => onFile(event.target.files?.[0]?.name ?? "")} />
+          </label>
+          <span className="import-source-caption">PDF, CSV, or image</span>
+        </div>
+        <div className="import-divider"><span>OR</span></div>
+        <div className="import-source-group">
+          <span className="import-source-label"><CalendarCheck2 size={14} /> Import calendar</span>
+          <button className="import-source-button" onClick={() => onFile("Sample university timetable.pdf")}><CalendarCheck2 size={15} /> Import Calendar</button>
+          <span className="import-source-caption">Import from Google Calendar</span>
+        </div>
+        <div className="import-divider"><span>OR</span></div>
+        <div className="import-source-group">
+          <span className="import-source-label"><PenLine size={14} /> Enter manually</span>
+          <button className="import-source-button" onClick={onManual}><PenLine size={15} /> Enter Manually</button>
+        </div>
+        {fileName && <div className="import-file-chip"><Check size={16} /> {fileName}</div>}
+        <p className="feasibility-note">Parsing and OAuth are finalist-phase builds. Manual entry remains the MVP fallback.</p>
+      </section>
+    )}
+    <button className="primary-button" onClick={reviewed ? onApprove : onContinue}>{reviewed ? "Approve Fixed Load" : "Continue"} <ArrowRight size={17} /></button>
+  </div>;
 }
 
 function Triage({ calculation, displayMargin, items, selectedTriage, selectedRecovery, remainingDeficit, overrideCount, outcome, onToggle, onApply, onContinue, onProceed, onPlanner, onDashboard }: { calculation: CalculationShape; displayMargin: number; items: FlexibleTask[]; selectedTriage: number[]; selectedRecovery: number; remainingDeficit: number; overrideCount: number; outcome: TriageOutcome; onToggle: (id: number) => void; onApply: () => void; onContinue: () => void; onProceed: () => void; onPlanner: () => void; onDashboard: () => void }) {
@@ -1032,7 +1116,29 @@ function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtec
     { id: 102, day: "Thursday", startTime: "18:30", endTime: "19:30", type: loadPattern.category === "social" ? "Solo time" : "Screen-free wind-down", locked: false },
     { id: 103, day: "Sunday", startTime: "10:00", endTime: "11:00", type: "Sleep extension", locked: false },
   ];
-  return <div className="planner-page"><div className="screen-header"><div><p className="eyebrow">Recovery Planner <span>05 / 06</span></p><h1 className="page-heading">Schedule recovery before tasks fill the week.</h1></div><div className="load-pattern-pill"><span className="status-dot status-dot-blue" /> Load pattern: {loadPattern.label}</div></div><div className="recommendation-panel"><div className="recommendation-icon"><Leaf size={22} /></div><div><span className="card-label">Based on this week's load</span><strong>{loadPattern.recommendation}</strong><p>Every suggestion references a specific opening in your current schedule.</p></div></div><p className="planner-intro">Scheduled before your remaining tasks. Obligations fill what's left.</p><div className="suggested-blocks">{blocks.map((block) => <div className={`planner-block ${block.locked ? "planner-block-locked" : ""}`} key={block.id}><div className="planner-block-top"><span className="planner-day">{block.day}</span><span className="planner-time">{block.startTime} – {block.endTime}</span>{block.locked && <span className="locked-label"><LockKeyhole size={13} /> Protected</span>}</div><strong>{block.type}</strong><small>After 2 consecutive high-load days</small><div className="planner-block-actions">{block.locked ? <span className="locked-copy"><ShieldCheck size={15} /> Tier 2 immediately</span> : <><button className="secondary-button" onClick={() => onProtect(block.id)}>Protect</button><button className="text-button">Edit</button></>}</div></div>)}</div>{plannerMessage && <div className="planner-message"><Check size={16} /> {plannerMessage}</div>}<div className="planner-actions"><button className="primary-button" onClick={onLockAll}><LockKeyhole size={17} /> Lock All Suggested Blocks</button><button className="secondary-button" onClick={onSkip}>Skip for Now</button></div></div>;
+  return <div className="planner-page">
+    <div className="screen-title-block"><h1>Schedule Recovery</h1><p>Before tasks fill the week</p></div>
+    <section className="card planner-warning-card">
+      <span className="card-label">Based on this week's load</span>
+      <div className="planner-warning-banner"><TriangleAlert size={16} /> {loadPattern.recommendation}</div>
+    </section>
+    <section className="card planner-blocks-card">
+      <span className="card-label">Scheduled before your remaining tasks, obligations fill what's left</span>
+      <div className="planner-block-list">
+        {blocks.map((block) => <div className={`planner-block-row ${block.locked ? "planner-block-locked" : ""}`} key={block.id}>
+          <div className="planner-block-top"><span className="planner-day-pill">{block.day}</span><span className="planner-time">{block.startTime} – {block.endTime}</span></div>
+          <strong>{block.type}</strong>
+          <small>After 2 consecutive high-load days</small>
+          <div className="planner-block-actions">{block.locked ? <span className="locked-copy"><ShieldCheck size={15} /> Protected</span> : <><button className="secondary-button planner-action-btn" onClick={() => onProtect(block.id)}>Protect</button><button className="text-button planner-action-btn">Edit</button></>}</div>
+        </div>)}
+      </div>
+    </section>
+    {plannerMessage && <div className="planner-message"><Check size={16} /> {plannerMessage}</div>}
+    <div className="button-stack">
+      <button className="primary-button" onClick={onLockAll}><LockKeyhole size={17} /> Lock All Suggested Blocks</button>
+      <button className="secondary-button" onClick={onSkip}>Skip for Now</button>
+    </div>
+  </div>;
 }
 
 function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, energyCheckIns, onNextWeek, onAdjust }: { calculation: CalculationShape; overrideCount: number; taskOutcomes: TaskOutcomeRecord[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; onNextWeek: () => void; onAdjust: () => void }) {
@@ -1052,7 +1158,32 @@ function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, en
   const weeklyCheckInScores = last7Days.flatMap((day) => [day.moodValue ? CHECKIN_QUALITY_SCORE[day.moodValue] : null, day.energyValue ? CHECKIN_QUALITY_SCORE[day.energyValue] : null]).filter((score): score is number => score !== null);
   const avgCheckInScore = weeklyCheckInScores.length ? weeklyCheckInScores.reduce((sum, score) => sum + score, 0) / weeklyCheckInScores.length : null;
   const recoveryQualityLabel = avgCheckInScore === null ? null : avgCheckInScore < 1 ? "Needs attention" : avgCheckInScore < 2 ? "Moderate" : "Well restored";
-  return <div className="reflection-page"><div className="screen-header"><div><p className="eyebrow">Weekly reflection <span>06 / 06</span></p><h1 className="page-heading">Week 36 Reflection</h1><p className="date-range">Sept 1 – Sept 7 · A view of what recovery looked like this week.</p></div><div className="reflection-mark"><ShieldCheck size={23} /></div></div><div className="reflection-message"><span className="message-rule" /><p>You protected your recovery this week.<br />That's what sustainable performance looks like.</p></div><div className="reflection-metrics"><MetricCard icon={<Moon size={18} />} label="Recovery Maintained" value={`${maintained} hrs`} mark="✓" tone="blue" /><MetricCard icon={<ShieldCheck size={18} />} label="Recovery Floor Breached" value="0 times" mark="✓" tone="green" /><MetricCard icon={<RotateCcw size={18} />} label="Commitments Rebalanced" value="3" mark="✓" tone="green" /><MetricCard icon={<TriangleAlert size={18} />} label={'Add Anyway Overrides'} value={String(overrideCount)} mark={overrideCount > 2 ? "!" : "—"} tone={overrideCount > 2 ? "amber" : "muted"} /><MetricCard icon={<ShieldCheck size={18} />} label="Recovery Quality" value={recoveryQualityLabel ?? "Pending"} subLabel={recoveryQualityLabel ? undefined : "Complete a daily check-in on the Today screen."} mark={recoveryQualityLabel ? "✓" : "—"} tone={recoveryQualityLabel === "Needs attention" ? "amber" : recoveryQualityLabel ? "green" : "muted"} /><MetricCard icon={<ShieldCheck size={18} />} label="Recovery Consistency" value={`Floor protected ${floorProtectedDays} of 7 days`} mark={floorProtectedDays >= 5 ? "✓" : "!"} tone={floorProtectedDays >= 5 ? "green" : floorProtectedDays < 3 ? "amber" : "muted"} /></div>{taskOutcomes.length > 0 && <p className="outcome-summary-line">Task outcomes this week: {outcomeCounts.Easy} Easy · {outcomeCounts.Fine} Fine · {outcomeCounts.Hard} Hard · {outcomeCounts.Disaster} Disaster</p>}<section className="stress-pattern"><span className="card-label">Stress Pattern</span><div className="stress-pattern-list">{last7Days.map((day) => { const moodEntry = day.moodValue ? { ...moodMeta(day.moodValue), label: day.moodValue as string } : null; const energyEntry = day.energyValue ? { ...energyMeta(day.energyValue), label: day.energyValue as string } : null; const entry = moodEntry ?? energyEntry; return <div className="stress-pattern-row" key={day.dayLabel}><span className="stress-pattern-day">{day.dayLabel}</span><span className="stress-pattern-value" style={entry ? { color: entry.color } : undefined}>{entry ? `${entry.emoji} ${entry.label}` : "No check-in"}</span></div>; })}</div></section><div className="hardest-day"><div><span className="card-label">The hardest day</span><strong>Your hardest day: {DAYS[hardestIndex]}</strong><p>Next week: Consider protecting {DAYS[hardestIndex]} evening.</p></div><img src={WEEK_LINES_URL} alt="" /></div><div className="ignition-hook"><div><span className="card-label">Week 37 ignition</span><strong>Your hardest day was {DAYS[hardestIndex]}.</strong><p>Consider protecting {DAYS[hardestIndex]} evening before Week 37 begins.</p></div><button className="primary-button" onClick={onNextWeek}>Set Up Week 37 <ArrowRight size={17} /></button></div><div className="reflection-actions"><button className="secondary-button" onClick={onAdjust}><SlidersHorizontal size={17} /> Adjust Recovery Floor</button></div></div>;
+  return <div className="reflection-page">
+    <div className="screen-title-block"><h1>Week 36 Reflection</h1></div>
+    <section className="card reflection-message-card">
+      <p>You protected your recovery this week, that's what sustainable performance looks like.</p>
+    </section>
+    <section className="card reflection-metrics-card">
+      <div className="reflection-metrics">
+        <MetricCard icon={<Moon size={18} />} label="Recovery Maintained" value={`${maintained} hrs`} mark="✓" tone="blue" />
+        <MetricCard icon={<ShieldCheck size={18} />} label="Recovery Floor Breached" value="0 times" mark="✓" tone="green" />
+        <MetricCard icon={<ShieldCheck size={18} />} label="Recovery Quality" value={recoveryQualityLabel ?? "Pending"} subLabel={recoveryQualityLabel ? undefined : "Complete a daily check-in on the Today screen."} mark={recoveryQualityLabel ? "✓" : "—"} tone={recoveryQualityLabel === "Needs attention" ? "amber" : recoveryQualityLabel ? "green" : "muted"} />
+        <MetricCard icon={<ShieldCheck size={18} />} label="Recovery Consistency" value={`Floor protected ${floorProtectedDays} of 7 days`} mark={floorProtectedDays >= 5 ? "✓" : "!"} tone={floorProtectedDays >= 5 ? "green" : floorProtectedDays < 3 ? "amber" : "muted"} />
+        <MetricCard icon={<RotateCcw size={18} />} label="Commitments Rebalanced" value="3" mark="✓" tone="green" />
+        <MetricCard icon={<TriangleAlert size={18} />} label={'Add Anyway Overrides'} value={String(overrideCount)} mark={overrideCount > 2 ? "!" : "—"} tone={overrideCount > 2 ? "amber" : "muted"} />
+      </div>
+    </section>
+    {taskOutcomes.length > 0 && <p className="outcome-summary-line">Task outcomes this week: {outcomeCounts.Easy} Easy · {outcomeCounts.Fine} Fine · {outcomeCounts.Hard} Hard · {outcomeCounts.Disaster} Disaster</p>}
+    <section className="card stress-pattern">
+      <span className="card-label">Stress Pattern</span>
+      <div className="stress-pattern-list">{last7Days.map((day) => { const moodEntry = day.moodValue ? { ...moodMeta(day.moodValue), label: day.moodValue as string } : null; const energyEntry = day.energyValue ? { ...energyMeta(day.energyValue), label: day.energyValue as string } : null; const entry = moodEntry ?? energyEntry; return <div className="stress-pattern-row" key={day.dayLabel}><span className="stress-pattern-day">{day.dayLabel}</span><span className="stress-pattern-value" style={entry ? { color: entry.color } : undefined}>{entry ? `${entry.emoji} ${entry.label}` : "No check-in"}</span></div>; })}</div>
+    </section>
+    <section className="card reflection-insight-card">
+      <div className="insight-row"><Moon size={16} /><span><strong>This week's goal</strong><small>Your hardest day: {DAYS[hardestIndex]}. Consider protecting {DAYS[hardestIndex]} evening.</small></span></div>
+      <button className="insight-row insight-row-action" onClick={onNextWeek}><BarChart3 size={16} /><span><strong>Week in insight</strong><small>Your hardest day was {DAYS[hardestIndex]}.</small></span><span className="insight-link">See full insight <ArrowRight size={13} /></span></button>
+    </section>
+    <div className="reflection-actions"><button className="secondary-button" onClick={onAdjust}><SlidersHorizontal size={17} /> Adjust Recovery Floor</button></div>
+  </div>;
 }
 
 function MetricCard({ icon, label, value, subLabel, mark, tone }: { icon: ReactNode; label: string; value: string; subLabel?: string; mark: string; tone: "blue" | "green" | "amber" | "muted" }) { return <div className={`metric-card metric-${tone}`}><div className="metric-label">{icon}<span>{label}</span></div><div className="metric-value">{value}<span>{mark}</span></div>{subLabel && <p className="metric-sub-label">{subLabel}</p>}</div>; }
@@ -1169,7 +1300,5 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
     </div>
   );
 }
-
-function BottomNav({ screen, onNavigate }: { screen: Screen; onNavigate: (screen: Screen) => void }) { const items: { screen: Screen; label: string; icon: ReactNode }[] = [{ screen: "dashboard", label: "Today", icon: <Grid2X2 size={18} /> }, { screen: "mirror", label: "Add Task", icon: <Plus size={19} /> }, { screen: "planner", label: "Planner", icon: <Leaf size={18} /> }, { screen: "reflection", label: "Reflection", icon: <BarChart3 size={18} /> }]; return <nav className="bottom-nav" aria-label="Primary"><div className="bottom-nav-inner">{items.map((item) => <button key={item.screen} className={`nav-item ${screen === item.screen ? "nav-item-active" : ""}`} onClick={() => onNavigate(item.screen)}>{item.icon}<span>{item.label}</span></button>)}</div></nav>; }
 
 export default App;
