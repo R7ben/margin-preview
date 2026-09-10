@@ -785,13 +785,13 @@ function App() {
   );
 }
 
-const NAV_ITEMS: { id: Screen; label: string; icon: ReactNode }[] = [
+const NAV_ITEMS: { id: Screen; label: string; icon: ReactNode; sub?: boolean }[] = [
   { id: "dashboard", label: "Today", icon: <Home size={18} /> },
+  { id: "onboarding", label: "Recovery Floor Setup", icon: <ShieldCheck size={15} />, sub: true },
   { id: "mirror", label: "Add Task", icon: <Plus size={18} /> },
   { id: "planner", label: "Recovery Planner", icon: <Moon size={18} /> },
   { id: "reflection", label: "Weekly Reflection", icon: <BarChart3 size={18} /> },
   { id: "import", label: "Import Schedule", icon: <Upload size={18} /> },
-  { id: "onboarding", label: "Recovery Floor Setup", icon: <ShieldCheck size={18} /> },
 ];
 
 function NavDrawer({ open, activeScreen, onNavigate, onClose }: { open: boolean; activeScreen: Screen; onNavigate: (screen: Screen) => void; onClose: () => void }) {
@@ -805,7 +805,7 @@ function NavDrawer({ open, activeScreen, onNavigate, onClose }: { open: boolean;
         </div>
         <nav className="nav-drawer-list">
           {NAV_ITEMS.map((item) => (
-            <button key={item.id} className={`nav-drawer-item ${activeScreen === item.id ? "nav-drawer-item-active" : ""}`} onClick={() => onNavigate(item.id)}>
+            <button key={item.id} className={`nav-drawer-item ${item.sub ? "nav-drawer-item-sub" : ""} ${activeScreen === item.id ? "nav-drawer-item-active" : ""}`} onClick={() => onNavigate(item.id)}>
               {item.icon}<span>{item.label}</span>
             </button>
           ))}
