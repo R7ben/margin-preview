@@ -12,7 +12,7 @@ export default function App() {
   const Page = path === "/terms" ? Terms : path === "/privacy" ? Privacy : Home;
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
+      <ThemeProvider defaultTheme="light" switchable>
         <TooltipProvider>
           <Toaster />
           <Page />

@@ -31,6 +31,7 @@ import {
   Plus,
   RotateCcw,
   Send,
+  Sun,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -43,6 +44,7 @@ import {
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
+import { useTheme } from "../contexts/ThemeContext";
 
 type Screen = "onboarding" | "dashboard" | "mirror" | "triage" | "planner" | "reflection" | "import" | "settings" | "guide" | "outcomes-summary";
 type CognitiveLoad = "Low" | "Medium" | "High";
@@ -1276,6 +1278,7 @@ function NavDrawer({ open, activeScreen, onNavigate, onClose }: { open: boolean;
 }
 
 function Header({ screen, isDark, onBack, onMenu, onHelp }: { screen: Screen; isDark: boolean; onBack: () => void; onMenu: () => void; onHelp: () => void }) {
+  const { theme, toggleTheme } = useTheme();
   return (
     <header className={`topbar ${isDark ? "topbar-dark" : "topbar-light"}`}>
       <div className="topbar-inner">
@@ -1285,6 +1288,7 @@ function Header({ screen, isDark, onBack, onMenu, onHelp }: { screen: Screen; is
           <span className="brand-wordmark">MARGIN</span>
         </div>
         {screen !== "guide" && <button className="help-button" aria-label="How it works" title="How it works" onClick={onHelp}>?</button>}
+        <button className="theme-toggle" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={toggleTheme}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
         <span className="topbar-spacer" aria-hidden="true" />
       </div>
       {screen !== "dashboard" && screen !== "guide" && <button className="topbar-back" aria-label="Back to dashboard" onClick={onBack}><ArrowLeft size={14} /> Back</button>}
@@ -1809,6 +1813,7 @@ function Guide({ step, setStep, onClose, onDone }: { step: number; setStep: Disp
 }
 
 function Settings({ onBack }: { onBack: () => void }) {
+  const { theme, toggleTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => typeof window === "undefined" ? true : JSON.parse(window.localStorage.getItem("notifications-enabled") ?? "true"));
   const [reminderInterval, setReminderInterval] = useState(() => typeof window === "undefined" ? "4" : window.localStorage.getItem("notification-interval") ?? "4");
   const handleSave = () => {
@@ -1817,7 +1822,7 @@ function Settings({ onBack }: { onBack: () => void }) {
     toast.success("Settings saved");
   };
   const intervalOptions = [{ value: "2", label: "Every 2 hours" }, { value: "4", label: "Every 4 hours" }, { value: "6", label: "Every 6 hours" }, { value: "twice", label: "Twice a day (9am, 5pm)" }, { value: "once", label: "Once a day (9am)" }, { value: "manual", label: "Manual only (I'll check in)" }];
-  return <div className="settings-screen"><div className="settings-heading"><button className="text-button settings-back-button" onClick={onBack}><ArrowLeft size={14} /> Settings</button><h1>Settings</h1></div><section className="card settings-card"><span className="card-label">Notifications</span><label className="settings-toggle-row"><span><strong>Mood Check Reminders</strong><small>Prompt you to log how you feel.</small></span><input type="checkbox" checked={notificationsEnabled} onChange={(event) => setNotificationsEnabled(event.target.checked)} /></label><div className="settings-option-group"><span className="settings-option-label">How often?</span><div className="interval-options">{intervalOptions.map((option) => <label key={option.value}><input type="radio" name="notification-interval" value={option.value} checked={reminderInterval === option.value} onChange={(event) => setReminderInterval(event.target.value)} />{option.label}</label>)}</div></div><button className="primary-button" onClick={handleSave}>Save preferences</button></section></div>;
+  return <div className="settings-screen"><div className="settings-heading"><button className="text-button settings-back-button" onClick={onBack}><ArrowLeft size={14} /> Settings</button><h1>Settings</h1></div><section className="card settings-card"><span className="card-label">Appearance</span><div className="settings-group"><span className="settings-option-label">Theme</span><div className="theme-options"><button className={`theme-option ${theme === "light" ? "active" : ""}`} onClick={() => theme !== "light" && toggleTheme()}>☀️ Light</button><button className={`theme-option ${theme === "dark" ? "active" : ""}`} onClick={() => theme !== "dark" && toggleTheme()}>🌙 Dark</button></div><p className="settings-hint">Dark mode reduces eye strain before bed.</p></div><span className="card-label">Notifications</span><label className="settings-toggle-row"><span><strong>Mood Check Reminders</strong><small>Prompt you to log how you feel.</small></span><input type="checkbox" checked={notificationsEnabled} onChange={(event) => setNotificationsEnabled(event.target.checked)} /></label><div className="settings-option-group"><span className="settings-option-label">How often?</span><div className="interval-options">{intervalOptions.map((option) => <label key={option.value}><input type="radio" name="notification-interval" value={option.value} checked={reminderInterval === option.value} onChange={(event) => setReminderInterval(event.target.value)} />{option.label}</label>)}</div></div><button className="primary-button" onClick={handleSave}>Save preferences</button></section></div>;
 }
 
 function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, energyCheckIns, recoveryBlocks, onNextWeek, onAdjust }: { calculation: CalculationShape; overrideCount: number; taskOutcomes: TaskOutcomeRecord[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; recoveryBlocks: RecoveryBlock[]; onNextWeek: () => void; onAdjust: () => void }) {
