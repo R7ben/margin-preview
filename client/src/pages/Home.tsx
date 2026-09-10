@@ -4,7 +4,7 @@
  * deep ocean frames the interface, blue marks protected recovery infrastructure, and the four state colors
  * communicate actual Recovery Margin changes. Keep whitespace generous, language observational, and agency intact.
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -44,7 +44,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 
-type Screen = "onboarding" | "dashboard" | "mirror" | "triage" | "planner" | "reflection" | "import" | "settings";
+type Screen = "onboarding" | "dashboard" | "mirror" | "triage" | "planner" | "reflection" | "import" | "settings" | "guide";
 type CognitiveLoad = "Low" | "Medium" | "High";
 type TaskCategory = "mental" | "social" | "physical" | "errands";
 type TriageOutcome = "full" | "partial" | "failure" | null;
@@ -607,6 +607,8 @@ function App() {
   });
   const [checkInNotice, setCheckInNotice] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [guideStep, setGuideStep] = useState(0);
+  const [guideReturnScreen, setGuideReturnScreen] = useState<Screen>("dashboard");
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -931,6 +933,7 @@ function App() {
   };
 
   const navTo = (next: Screen) => {
+    if (next === "guide") { setGuideReturnScreen(screen); setGuideStep(0); }
     setTriageOutcome(null);
     setTriageOutcomeDeficit(null);
     setPlannerMessage("");
@@ -951,7 +954,7 @@ function App() {
       <div className="app-frame">
         <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} />
         {checkInNotice && <div className="checkin-log-toast" role="status" aria-live="polite">{checkInNotice}</div>}
-        <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} />
+        <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} onHelp={() => navTo("guide")} />
         <div key={screen} className="screen-enter">
         {screen === "onboarding" ? (
           <Onboarding
@@ -1087,6 +1090,7 @@ function App() {
                 />
               )}
               {screen === "settings" && <Settings onBack={() => navTo("dashboard")} />}
+              {screen === "guide" && <Guide step={guideStep} setStep={setGuideStep} onClose={() => setScreen(guideReturnScreen)} onDone={() => navTo("dashboard")} />}
             </main>
           </>
         )}
@@ -1129,7 +1133,7 @@ function App() {
             </button>
           </div>
         )}
-        {screen !== "onboarding" && screen !== "import" && screen !== "triage" && screen !== "settings" && <BottomTabBar active={screen} onNavigate={navTo} />}
+        {screen !== "onboarding" && screen !== "import" && screen !== "triage" && screen !== "settings" && screen !== "guide" && <BottomTabBar active={screen} onNavigate={navTo} />}
       </div>
       <NavDrawer open={drawerOpen} activeScreen={screen} onNavigate={(next) => { navTo(next); setDrawerOpen(false); }} onClose={() => setDrawerOpen(false)} />
     </div>
@@ -1194,7 +1198,7 @@ function NavDrawer({ open, activeScreen, onNavigate, onClose }: { open: boolean;
   );
 }
 
-function Header({ screen, isDark, onBack, onMenu }: { screen: Screen; isDark: boolean; onBack: () => void; onMenu: () => void }) {
+function Header({ screen, isDark, onBack, onMenu, onHelp }: { screen: Screen; isDark: boolean; onBack: () => void; onMenu: () => void; onHelp: () => void }) {
   return (
     <header className={`topbar ${isDark ? "topbar-dark" : "topbar-light"}`}>
       <div className="topbar-inner">
@@ -1203,9 +1207,10 @@ function Header({ screen, isDark, onBack, onMenu }: { screen: Screen; isDark: bo
           <BrandMark className="brand-mark" />
           <span className="brand-wordmark">MARGIN</span>
         </div>
+        {screen !== "guide" && <button className="help-button" aria-label="How it works" title="How it works" onClick={onHelp}>?</button>}
         <span className="topbar-spacer" aria-hidden="true" />
       </div>
-      {screen !== "dashboard" && <button className="topbar-back" aria-label="Back to dashboard" onClick={onBack}><ArrowLeft size={14} /> Back</button>}
+      {screen !== "dashboard" && screen !== "guide" && <button className="topbar-back" aria-label="Back to dashboard" onClick={onBack}><ArrowLeft size={14} /> Back</button>}
     </header>
   );
 }
@@ -1645,6 +1650,21 @@ function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtec
     </div>
     {unlockTarget !== null && <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="unlock-confirm-title"><div className="planner-confirm-sheet"><h2 id="unlock-confirm-title">{unlockTarget === "all" ? "Remove all recovery blocks?" : "Remove this recovery block?"}</h2><p>{unlockTarget === "all" ? "All protected recovery time this week will be released." : "This will free up the time but reduce your protected recovery for the week."}</p><div className="planner-confirm-actions"><button className="primary-button primary-button-danger" onClick={onConfirmUnlock}>{unlockTarget === "all" ? "Yes, unlock all" : "Yes, remove it"}</button><button className="secondary-button" onClick={onCancelUnlock}>{unlockTarget === "all" ? "Keep them protected" : "Keep it protected"}</button></div></div></div>}
   </div>;
+}
+
+function Guide({ step, setStep, onClose, onDone }: { step: number; setStep: Dispatch<SetStateAction<number>>; onClose: () => void; onDone: () => void }) {
+  const steps = [
+    { icon: "🛡️", title: "Set Your Recovery Floor", description: "Your non-negotiable baseline for rest. Tell MARGIN the minimum sleep and decompression you need each week. Everything else is planned around protecting that floor.", example: "Sleep + decompression = your protected baseline" },
+    { icon: "🗓️", title: "See Your Week at a Glance", description: "The weekly view puts tasks, commitments, and recovery together in one calm overview. Color and load cues help you spot crowded days before they become stressful.", example: "Week view · load mapped across Monday–Sunday" },
+    { icon: "☀️", title: "Focus on Today", description: "Switch to Daily View when you need a smaller surface. Tasks are grouped into morning, afternoon, and evening, with deadline urgency made easy to scan.", example: "Today · Morning · Afternoon · Evening" },
+    { icon: "➕", title: "Add a Task", description: "When you add a commitment, MARGIN shows the likely consequence before you commit. You can adjust the estimate, find a better slot, or defer a task when the week is tight.", example: "Add task → preview impact → choose a safer option" },
+    { icon: "🌙", title: "Protect Recovery", description: "Recovery Planner suggests blocks based on your load. Protect the suggested time so new commitments respect the rest your week needs.", example: "Protected recovery block · Thursday 18:30–19:30" },
+    { icon: "📈", title: "Reflect on Patterns", description: "Weekly Reflection turns your check-ins and schedule into a readable pattern. Use it to notice stress, mood trends, and which recovery choices helped.", example: "Mood trend ↗ · recovery consistency · weekly insight" },
+    { icon: "💬", title: "Ask Can I Afford This?", description: "Use the quick check when a new task appears. It compares the task with your current margin and gives a direct, grounded answer before you add it.", example: "Quick check · margin impact · next best move" },
+    { icon: "⚙️", title: "Customize Settings", description: "Settings lets you choose whether mood reminders appear and how often they prompt you. You can use a schedule, select Manual only, and change it whenever your routine changes.", example: "Notifications · interval · save preferences" },
+  ];
+  const current = steps[step];
+  return <div className="guide-screen"><div className="guide-header"><button className="guide-nav-button" aria-label="Previous guide step" disabled={step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))}>←</button><span>Step {step + 1} of {steps.length}</span><button className="guide-close-button" aria-label="Close guide" onClick={onClose}>✕</button></div><div className="guide-progress"><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div><div className="guide-content"><div className="guide-icon" aria-hidden="true">{current.icon}</div><span className="guide-kicker">How MARGIN works</span><h2>{current.title}</h2><p>{current.description}</p><div className="guide-example">{current.example}</div></div><div className="guide-footer">{step < steps.length - 1 ? <button className="primary-button" onClick={() => setStep((value) => Math.min(steps.length - 1, value + 1))}>Next <ArrowRight size={16} /></button> : <button className="primary-button" onClick={onDone}>Done</button>}</div></div>;
 }
 
 function Settings({ onBack }: { onBack: () => void }) {
