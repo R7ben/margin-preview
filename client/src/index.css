@@ -517,7 +517,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .import-divider::before, .import-divider::after { content: ""; flex: 1; height: 1px; background: var(--border-crisp); }
 .import-back-button { margin-top: 16px; }
 .file-input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
-.import-note, .feasibility-note { color: #6E7280; font-size: 12px; line-height: 1.55; }
+.import-note { color: #6E7280; font-size: 12px; line-height: 1.55; }
 .import-file-chip { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 11px; color: #1B2230; border: 1px solid #BFE0DB; border-radius: 18px; background: #E1F1EE; font-size: 11px; font-weight: 600; }
 .import-class-list { margin-top: 17px; border-top: 1px solid #E4E0EC; }
 @media (max-width: 640px) {

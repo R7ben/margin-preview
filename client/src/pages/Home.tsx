@@ -1145,7 +1145,6 @@ function ImportCommitments({ fileName, reviewed, onFile, onContinue, onApprove, 
           <button className="import-source-button" onClick={onManual}><PenLine size={15} /> Enter Manually</button>
         </div>
         {fileName && <div className="import-file-chip"><Check size={16} /> {fileName}</div>}
-        <p className="feasibility-note">Parsing and OAuth are finalist-phase builds. Manual entry remains the MVP fallback.</p>
       </section>
     )}
     <button className="primary-button" onClick={reviewed ? onApprove : onContinue}>{reviewed ? "Approve Fixed Load" : "Continue"} <ArrowRight size={17} /></button>
