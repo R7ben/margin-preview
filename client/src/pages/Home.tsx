@@ -5,6 +5,7 @@
  * communicate actual Recovery Margin changes. Keep whitespace generous, language observational, and agency intact.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
@@ -622,6 +623,8 @@ function App() {
     <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}${screen === "dashboard" ? " app-shell-dashboard" : ""}`}>
       <div className="app-frame">
         <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} />
+        <AnimatePresence mode="wait" initial={false}>
+        <motion.div key={screen} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.28, ease: "easeOut" }}>
         {screen === "onboarding" ? (
           <Onboarding
             sleepHours={sleepHours}
@@ -748,6 +751,8 @@ function App() {
             </main>
           </>
         )}
+        </motion.div>
+        </AnimatePresence>
         {showQuickCheck && (
           <QuickCheck
             name={quickName}
