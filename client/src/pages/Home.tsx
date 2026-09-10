@@ -1298,7 +1298,7 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
     const systemPreamble = `You are Margin, a recovery-first student planning assistant. Using ONLY the real data below, answer the student's question in 2-3 short sentences. Tell them honestly whether their Recovery Margin is comfortable, tight, or in deficit. If tight or in deficit, name one specific task they could defer. Be direct, warm, and brief — no bullet points, no headers, never invent facts not present below.\n\n${context}`;
     try {
       if (!apiKey) throw new Error("missing API key");
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
