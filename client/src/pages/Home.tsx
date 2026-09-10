@@ -1315,8 +1315,11 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!text) throw new Error("empty response");
       setChatMessages([...nextMessages, { role: "assistant", content: String(text).trim() }]);
-    } catch {
-      setChatMessages([...nextMessages, { role: "assistant", content: "Couldn't reach Gemini — check your connection.", isError: true }]);
+    } catch (error) {
+      const message = error instanceof Error && error.message === "missing API key"
+        ? "Gemini isn't configured for this preview — add VITE_GEMINI_API_KEY to enable AI replies."
+        : "Gemini request failed — check the deployment configuration or try again.";
+      setChatMessages([...nextMessages, { role: "assistant", content: message, isError: true }]);
     } finally {
       setChatLoading(false);
     }
