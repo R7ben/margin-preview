@@ -493,6 +493,15 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .outcome-full { color: #5C7A16; border-color: #5C7A16; background: #EEF6DC; }
 .outcome-partial { color: #C97F1E; border-color: #C97F1E; background: #FAEDD9; display: block; }
 .outcome-actions { display: flex; gap: 10px; margin-top: 17px; }
+.outcomes-card { max-width: 430px; margin: 28px auto 0; padding: 24px; border-radius: 16px; background: rgba(255,255,255,.9); text-align: center; backdrop-filter: blur(12px); }
+.outcomes-heading { display: flex; align-items: center; justify-content: center; gap: 8px; color: #1D9E75; font-size: 16px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.outcomes-lede { margin: 22px 0 0; color: #1B2230; font-size: 14px; font-weight: 700; }
+.outcomes-list { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
+.outcomes-card .outcome-item { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border-radius: 8px; color: #1D9E75; background: #F0FDF4; font-size: 13px; font-weight: 500; }
+.outcome-icon { font-size: 20px; }
+.outcome-insight { margin: 16px 0; color: #6B7280; font-size: 14px; line-height: 1.5; }
+.outcome-buttons { display: flex; gap: 12px; margin-top: 20px; }
+.outcome-buttons button { flex: 1; min-height: 46px; }
 .failure-panel { max-width: 650px; margin: 40px auto 0; padding: 35px; border: 1px solid rgba(209,79,62,.18); border-top: 4px solid #D14F3E; background: #FBE6E2; }
 .failure-mark { display: flex; width: 48px; height: 48px; align-items: center; justify-content: center; color: #D14F3E; background: rgba(209,79,62,.08); border-radius: 50%; }
 .failure-panel h1 { max-width: 480px; margin: 28px 0 0; color: #D14F3E; font-size: 30px; font-weight: 600; letter-spacing: -.05em; line-height: 1.08; }

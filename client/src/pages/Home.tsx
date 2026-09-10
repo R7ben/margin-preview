@@ -44,7 +44,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 
-type Screen = "onboarding" | "dashboard" | "mirror" | "triage" | "planner" | "reflection" | "import" | "settings" | "guide";
+type Screen = "onboarding" | "dashboard" | "mirror" | "triage" | "planner" | "reflection" | "import" | "settings" | "guide" | "outcomes-summary";
 type CognitiveLoad = "Low" | "Medium" | "High";
 type TaskCategory = "mental" | "social" | "physical" | "errands";
 type TriageOutcome = "full" | "partial" | "failure" | null;
@@ -438,6 +438,13 @@ const nextRecoveryBlock = (blocks: RecoveryBlock[]) => {
 const MOOD_STRAIN: Record<MoodValue, number> = { Energized: 0, Good: 1, Okay: 2, Drained: 3 };
 const ENERGY_STRAIN: Record<EnergyResponse, number> = { Ready: 0, Okay: 1.5, Rough: 3 };
 const CHECKIN_QUALITY_SCORE: Record<MoodValue | EnergyResponse, number> = { Drained: 0, Rough: 0, Okay: 1, Good: 2, Ready: 2, Energized: 3 };
+type ProtectedOutcomes = { protectedMargin: number; conflictsRemoved: number; protectedSleep: number };
+const calculateProtectedOutcomes = (beforeMargin: number, afterMargin: number, beforeRecoveryBlocks: number, afterRecoveryBlocks: number, beforeSleepHours: number, afterSleepHours: number): ProtectedOutcomes => ({
+  protectedMargin: Math.round((afterMargin - beforeMargin) * 10) / 10,
+  conflictsRemoved: Math.max(0, beforeRecoveryBlocks - afterRecoveryBlocks),
+  protectedSleep: Math.round((afterSleepHours - beforeSleepHours) * 10) / 10,
+});
+const calculateRiskMessage = (outcomes: ProtectedOutcomes) => outcomes.protectedMargin > 10 ? "You've restored a healthy margin. You can handle new work." : outcomes.protectedMargin > 5 ? "Your week is now balanced. Be careful with additional tasks." : outcomes.protectedMargin > 0 ? "Better, but still tight. Consider protecting more recovery time." : "You're still in deficit. More rebalancing needed.";
 
 // Least-squares linear regression over the check-in strain series (index vs. strain score),
 // giving a real slope for "is the student trending toward burnout" rather than a guess.
@@ -588,6 +595,7 @@ function App() {
   const [confirmBreach, setConfirmBreach] = useState(false);
   const [selectedTriage, setSelectedTriage] = useState<number[]>([]);
   const [triageOutcome, setTriageOutcome] = useState<TriageOutcome>(null);
+  const [protectedOutcomes, setProtectedOutcomes] = useState<ProtectedOutcomes | null>(null);
   const [showCommitmentForm, setShowCommitmentForm] = useState(false);
   const [commitmentName, setCommitmentName] = useState("");
   const [commitmentDays, setCommitmentDays] = useState<string[]>([]);
@@ -916,6 +924,10 @@ function App() {
   const applyTriage = () => {
     if (!selectedTriage.length) return;
     const released = selectedRecovery;
+    const beforeMargin = calculation.margin;
+    const beforeRecoveryBlocks = recoveryBlocks.filter((block) => block.locked).length;
+    const afterMargin = beforeMargin + released;
+    setProtectedOutcomes(calculateProtectedOutcomes(beforeMargin, afterMargin, beforeRecoveryBlocks, beforeRecoveryBlocks, sleepHours * 7, sleepHours * 7));
     const deficitBeforeSelection = Math.max(0, -triageBaseMargin);
     const deficitAfterSelection = Math.max(0, deficitBeforeSelection - released);
     setTasks((current) => current.map((task) => selectedTriage.includes(task.id) ? { ...task, deferred: true } : task));
@@ -924,6 +936,7 @@ function App() {
     else if (released > 0) setTriageOutcome("partial");
     else setTriageOutcome("failure");
     setSelectedTriage([]);
+    setScreen("outcomes-summary");
   };
 
   const openQuickCheck = () => {
@@ -1091,6 +1104,7 @@ function App() {
               )}
               {screen === "settings" && <Settings onBack={() => navTo("dashboard")} />}
               {screen === "guide" && <Guide step={guideStep} setStep={setGuideStep} onClose={() => setScreen(guideReturnScreen)} onDone={() => navTo("dashboard")} />}
+              {screen === "outcomes-summary" && protectedOutcomes && <OutcomesSummary outcomes={protectedOutcomes} onDashboard={() => navTo("dashboard")} />}
             </main>
           </>
         )}
@@ -1133,7 +1147,7 @@ function App() {
             </button>
           </div>
         )}
-        {screen !== "onboarding" && screen !== "import" && screen !== "triage" && screen !== "settings" && screen !== "guide" && <BottomTabBar active={screen} onNavigate={navTo} />}
+        {screen !== "onboarding" && screen !== "import" && screen !== "triage" && screen !== "settings" && screen !== "guide" && screen !== "outcomes-summary" && <BottomTabBar active={screen} onNavigate={navTo} />}
       </div>
       <NavDrawer open={drawerOpen} activeScreen={screen} onNavigate={(next) => { navTo(next); setDrawerOpen(false); }} onClose={() => setDrawerOpen(false)} />
     </div>
@@ -1688,6 +1702,10 @@ function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtec
     </div>
     {unlockTarget !== null && <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="unlock-confirm-title"><div className="planner-confirm-sheet"><h2 id="unlock-confirm-title">{unlockTarget === "all" ? "Remove all recovery blocks?" : "Remove this recovery block?"}</h2><p>{unlockTarget === "all" ? "All protected recovery time this week will be released." : "This will free up the time but reduce your protected recovery for the week."}</p><div className="planner-confirm-actions"><button className="primary-button primary-button-danger" onClick={onConfirmUnlock}>{unlockTarget === "all" ? "Yes, unlock all" : "Yes, remove it"}</button><button className="secondary-button" onClick={onCancelUnlock}>{unlockTarget === "all" ? "Keep them protected" : "Keep it protected"}</button></div></div></div>}
   </div>;
+}
+
+function OutcomesSummary({ outcomes, onDashboard }: { outcomes: ProtectedOutcomes; onDashboard: () => void }) {
+  return <div className="outcomes-card"><div className="outcomes-heading"><CircleCheck size={22} /><span>Rebalancing applied</span></div><p className="outcomes-lede">You just protected:</p><div className="outcomes-list">{outcomes.protectedSleep > 0 && <div className="outcome-item"><span className="outcome-icon">😴</span><span>{outcomes.protectedSleep} hour{outcomes.protectedSleep === 1 ? "" : "s"} of sleep</span></div>}{outcomes.conflictsRemoved > 0 && <div className="outcome-item"><span className="outcome-icon">🔓</span><span>{outcomes.conflictsRemoved} recovery conflict{outcomes.conflictsRemoved === 1 ? "" : "s"}</span></div>}{outcomes.protectedMargin > 0 && <div className="outcome-item"><span className="outcome-icon">📈</span><span>{outcomes.protectedMargin} hour{outcomes.protectedMargin === 1 ? "" : "s"} of recovery margin</span></div>}{outcomes.protectedSleep <= 0 && outcomes.conflictsRemoved <= 0 && outcomes.protectedMargin <= 0 && <div className="outcome-item"><span className="outcome-icon">⚠️</span><span>No additional margin was restored</span></div>}</div><p className="outcome-insight">{calculateRiskMessage(outcomes)}</p><div className="outcome-buttons"><button className="secondary-button" onClick={onDashboard}>Back to schedule</button><button className="primary-button" onClick={onDashboard}>View week</button></div></div>;
 }
 
 function Guide({ step, setStep, onClose, onDone }: { step: number; setStep: Dispatch<SetStateAction<number>>; onClose: () => void; onDone: () => void }) {
