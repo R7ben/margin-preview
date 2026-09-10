@@ -910,6 +910,7 @@ function App() {
                 <Dashboard
                   calculation={calculation}
                   tasks={tasks}
+                  fixedCommitments={fixedCommitments}
                   recoveryBlocks={recoveryBlocks.length ? recoveryBlocks : DEFAULT_RECOVERY_BLOCKS}
                   showEnergyCheckIn={showEnergyCheckIn}
                   showMorningCheckIn={showMorningCheckIn}
@@ -1214,8 +1215,10 @@ function RangeCard({ icon, label, value, note, min, max, step, inputValue, onCha
   return <div className="range-card"><div className="range-card-head"><div className="range-icon">{icon}</div><div><span className="range-label">{label}</span><p>{note}</p></div><strong>{value}</strong></div><input aria-label={label} type="range" min={min} max={max} step={step} value={inputValue} onChange={(event) => onChange(Number(event.target.value))} /></div>;
 }
 
-function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, showMorningCheckIn, onMorningCheckInRespond, onAddTask, onQuickCheck, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, onTriage, onRecordOutcome, onDeleteTaskSilently, onEnergyRespond }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; recoveryBlocks: RecoveryBlock[]; showEnergyCheckIn: boolean; showMorningCheckIn: boolean; onMorningCheckInRespond: (value: MoodValue) => void; onAddTask: () => void; onQuickCheck: () => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; onTriage: () => void; onRecordOutcome: (task: FlexibleTask, outcome: TaskOutcomeValue) => void; onDeleteTaskSilently: (id: number) => void; onEnergyRespond: (response: EnergyResponse) => void }) {
+function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showEnergyCheckIn, showMorningCheckIn, onMorningCheckInRespond, onAddTask, onQuickCheck, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, onTriage, onRecordOutcome, onDeleteTaskSilently, onEnergyRespond }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; fixedCommitments: FixedCommitment[]; recoveryBlocks: RecoveryBlock[]; showEnergyCheckIn: boolean; showMorningCheckIn: boolean; onMorningCheckInRespond: (value: MoodValue) => void; onAddTask: () => void; onQuickCheck: () => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; onTriage: () => void; onRecordOutcome: (task: FlexibleTask, outcome: TaskOutcomeValue) => void; onDeleteTaskSilently: (id: number) => void; onEnergyRespond: (response: EnergyResponse) => void }) {
   const [showFullWeek, setShowFullWeek] = useState(false);
+  const [dailyView, setDailyView] = useState<"week" | "day">("week");
+  const [dailyDate, setDailyDate] = useState(() => new Date());
   const [pendingOutcomeId, setPendingOutcomeId] = useState<number | null>(null);
   const pendingOutcomeIdRef = useRef<number | null>(null);
   useEffect(() => { pendingOutcomeIdRef.current = pendingOutcomeId; }, [pendingOutcomeId]);
@@ -1246,6 +1249,28 @@ function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, show
   const mustDo = pickMustDo(tasks);
   const maintenance = pickMaintenance(tasks, mustDo?.id);
   const today = new Date();
+  const weekMonday = new Date(today);
+  weekMonday.setHours(0, 0, 0, 0);
+  weekMonday.setDate(weekMonday.getDate() - ((weekMonday.getDay() + 6) % 7));
+  const weekSunday = new Date(weekMonday);
+  weekSunday.setDate(weekSunday.getDate() + 6);
+  const selectedDayName = CALENDAR_DAYS[dailyDate.getDay()];
+  const selectedDayIndex = (dailyDate.getDay() + 6) % 7;
+  const dailyTasks = activeTasks.filter((task) => task.deadline && selectedDayName.toLowerCase().startsWith(task.deadline.trim().toLowerCase().slice(0, 3)));
+  const dailyCommitments = fixedCommitments.filter((commitment) => commitment.days.some((day) => day.toLowerCase().startsWith(selectedDayName.slice(0, 3).toLowerCase())));
+  const dailyRecoveryBlocks = recoveryBlocks.filter((block) => block.locked && block.day.toLowerCase().startsWith(selectedDayName.slice(0, 3).toLowerCase()));
+  const dailyMargin = calculation.dailyMargins[selectedDayIndex] + calculation.dailyTask[selectedDayIndex];
+  const dailySlotTasks = {
+    morning: dailyTasks.filter((task) => task.category === "mental"),
+    afternoon: dailyTasks.filter((task) => task.category === "physical" || task.category === "errands"),
+    evening: dailyTasks.filter((task) => task.category === "social"),
+  };
+  const moveDailyDate = (offset: number) => {
+    const next = new Date(dailyDate);
+    next.setDate(next.getDate() + offset);
+    if (next < weekMonday || next > weekSunday) return;
+    setDailyDate(next);
+  };
   const lockInTasks = [mustDo ? { task: mustDo, tag: "Must-do" } : null, maintenance ? { task: maintenance, tag: "Maintenance" } : null].filter((item): item is { task: FlexibleTask; tag: string } => Boolean(item)).sort((a, b) => {
     const urgencyRank: Record<TaskUrgency, number> = { critical: 0, urgent: 1, normal: 2, flexible: 3 };
     const aUrgency = taskUrgency(a.task.deadline, today);
@@ -1269,7 +1294,8 @@ function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, show
     {showMorningCheckIn && <section className="card checkin-card"><span className="card-label">How do you feel today?</span><div className="pill-row">{MOOD_OPTIONS.map((option) => <button key={option.value} className={`pill pill-button ${moodPillTone[option.value]}`} onClick={() => onMorningCheckInRespond(option.value)}>{option.value}</button>)}</div></section>}
     {recoveryQualityBlock && !recoveryQualityDismissed && <RecoveryQualityCard block={recoveryQualityBlock} onSelect={onRecoveryQuality} />}
     {showEnergyCheckIn && <section className="card checkin-card"><span className="card-label">Heading into today...</span><div className="pill-row"><button className="pill pill-button pill-negative" onClick={() => onEnergyRespond("Rough")}>Rough</button><button className="pill pill-button pill-neutral" onClick={() => onEnergyRespond("Okay")}>Okay</button><button className="pill pill-button pill-positive" onClick={() => onEnergyRespond("Ready")}>Ready</button></div></section>}
-    <div className="dashboard-intro"><p className="eyebrow">Your week</p><h1 className="page-heading">Your Week</h1><p className="dashboard-subtitle">With recovery view</p><button className="text-action dashboard-reflection-link" onClick={onReflection}><BarChart3 size={14} /> Weekly Reflection</button></div>
+    <div className="dashboard-intro"><p className="eyebrow">Your week</p><h1 className="page-heading">Your Week</h1><p className="dashboard-subtitle">With recovery view</p><div className="dashboard-view-toggle"><button className={dailyView === "week" ? "dashboard-view-toggle-active" : ""} onClick={() => setDailyView("week")}>Week</button><button className={dailyView === "day" ? "dashboard-view-toggle-active" : ""} onClick={() => setDailyView("day")}>Day</button></div><button className="text-action dashboard-reflection-link" onClick={onReflection}><BarChart3 size={14} /> Weekly Reflection</button></div>
+    {dailyView === "week" ? <>
     <section className="card hero-margin-card">
       <div className="hero-card-head"><span className="card-label">Recovery Margin</span><div className="status-pill" style={{ color: status.color, borderColor: `${status.color}44`, background: `${status.color}10` }}><span className="status-dot" style={{ background: status.color }} />{status.label}</div></div>
       <div className="progress-ring-wrap">
@@ -1293,6 +1319,14 @@ function Dashboard({ calculation, tasks, recoveryBlocks, showEnergyCheckIn, show
       <div className="week-glance-list">{DAYS.map((day, index) => { const dayStatus = dailyStatusFor(calculation.dailyMargins[index]); const width = Math.max(8, Math.min(100, (calculation.dailyMargins[index] / maxDailyMargin) * 100)); return <div key={day} className="week-glance-row"><span className="week-glance-day">{day}</span><span className="week-glance-track"><span className="week-glance-fill" style={{ width: `${width}%`, background: dayStatus.color }} title={`${day}: ${dayStatus.label} · ${formatShortHours(calculation.dailyMargins[index])}`} /></span></div>; })}</div>
       <p className="side-note">Bars include your Recovery Floor, fixed load, and deadline-weighted tasks.</p>
     </section>
+    </> : <section className="card daily-view-card">
+      <div className="daily-view-head"><button className="daily-view-arrow" aria-label="Previous day" disabled={dailyDate <= weekMonday} onClick={() => moveDailyDate(-1)}><ArrowLeft size={16} /></button><div><span className="card-label">Today — {dailyDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</span><strong>{formatShortHours(dailyMargin)} available after fixed blocks</strong></div><button className="daily-view-arrow" aria-label="Next day" disabled={dailyDate >= weekSunday} onClick={() => moveDailyDate(1)}><ArrowRight size={16} /></button></div>
+      {[{ key: "morning", label: "Morning", time: "09:00 – 12:00" }, { key: "afternoon", label: "Afternoon", time: "12:00 – 17:00" }, { key: "evening", label: "Evening", time: "17:00 – 21:00" }].map((slot) => {
+        const slotTasks = dailySlotTasks[slot.key as keyof typeof dailySlotTasks];
+        const slotCommitments = dailyCommitments.filter((commitment) => commitment.startTime < (slot.key === "morning" ? "12:00" : slot.key === "afternoon" ? "17:00" : "21:00") && commitment.endTime > (slot.key === "morning" ? "09:00" : slot.key === "afternoon" ? "12:00" : "17:00"));
+        return <div className="daily-slot" key={slot.key}><div className="daily-slot-head"><strong>{slot.label}</strong><span>{slot.time}</span></div>{slotCommitments.map((commitment) => <div className="daily-blocked-bar" key={commitment.id}>Blocked · {commitment.name} · {commitment.startTime}–{commitment.endTime}</div>)}{slotTasks.length ? <div className="daily-task-chips">{slotTasks.map((task) => <button className={`daily-task-chip daily-task-chip-${task.category}`} key={task.id} onClick={() => requestDelete(task.id)}>{task.name} · {formatShortHours(task.estimatedHours)}</button>)}</div> : <span className="daily-empty-slot">No tasks — margin available</span>}{slot.key === "evening" && dailyRecoveryBlocks.map((block) => <div className="daily-recovery-bar" key={block.id}>░░ Recovery block · {block.type} · {block.startTime}–{block.endTime}</div>)}</div>;
+      })}
+    </section>}
     <section className="card category-breakdown-card">
       <span className="card-label">Available Capacity by Category</span>
       <div className="category-breakdown-bar">
