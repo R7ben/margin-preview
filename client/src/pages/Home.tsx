@@ -550,6 +550,7 @@ function App() {
   const [commitmentStart, setCommitmentStart] = useState("09:00");
   const [commitmentEnd, setCommitmentEnd] = useState("11:00");
   const [plannerMessage, setPlannerMessage] = useState("");
+  const [unlockTarget, setUnlockTarget] = useState<number | "all" | null>(null);
   const [recoveryQuality, setRecoveryQuality] = useState<"Fully" | "Partially" | "Not really" | null>(null);
   const [recoveryQualityDismissed, setRecoveryQualityDismissed] = useState(false);
   const [taskOutcomes, setTaskOutcomes] = useState<TaskOutcomeRecord[]>([]);
@@ -837,6 +838,18 @@ function App() {
     setPlannerMessage("Suggested recovery blocks are now part of your protected schedule.");
   };
 
+  const unlockBlock = (id: number) => {
+    setRecoveryBlocks((current) => (current.length ? current : DEFAULT_RECOVERY_BLOCKS).map((block) => block.id === id ? { ...block, locked: false } : block));
+    setPlannerMessage("Recovery block released.");
+    setUnlockTarget(null);
+  };
+
+  const unlockAllBlocks = () => {
+    setRecoveryBlocks((current) => (current.length ? current : DEFAULT_RECOVERY_BLOCKS).map((block) => ({ ...block, locked: false })));
+    setPlannerMessage("Protected recovery time released.");
+    setUnlockTarget(null);
+  };
+
   const applyTriage = () => {
     if (!selectedTriage.length) return;
     const released = selectedRecovery;
@@ -978,6 +991,11 @@ function App() {
                   plannerMessage={plannerMessage}
                   onProtect={protectBlock}
                   onLockAll={lockAllSuggested}
+                  onUnlock={(id) => setUnlockTarget(id)}
+                  onUnlockAll={() => setUnlockTarget("all")}
+                  unlockTarget={unlockTarget}
+                  onConfirmUnlock={() => unlockTarget === "all" ? unlockAllBlocks() : unlockTarget !== null ? unlockBlock(unlockTarget) : undefined}
+                  onCancelUnlock={() => setUnlockTarget(null)}
                   onSkip={() => navTo("dashboard")}
                 />
               )}
@@ -1530,7 +1548,7 @@ function Triage({ calculation, displayMargin, items, selectedTriage, selectedRec
 
 function FailureState({ onProtect, onDashboard }: { onProtect: () => void; onDashboard: () => void }) { return <div className="failure-panel"><div className="failure-mark"><TriangleAlert size={25} /></div><h1>Some recovery loss this week may be unavoidable.</h1><p>Based on your current commitments, there is no flexible combination that restores the full deficit.</p><div className="what-margin"><strong>What Margin can still do:</strong><span>→ Protect your highest-value sleep nights</span><span>→ Flag which days carry most risk</span><span>→ Plan recovery for next week</span></div><div className="outcome-actions"><button className="secondary-button" onClick={onProtect}>Plan Next Week</button><button className="primary-button" onClick={onDashboard}>Protect What's Left</button></div></div>; }
 
-function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtect, onLockAll, onSkip }: { loadPattern: { label: string; recommendation: string; category: TaskCategory }; recoveryBlocks: RecoveryBlock[]; plannerMessage: string; onProtect: (id: number) => void; onLockAll: () => void; onSkip: () => void }) {
+function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtect, onLockAll, onUnlock, onUnlockAll, unlockTarget, onConfirmUnlock, onCancelUnlock, onSkip }: { loadPattern: { label: string; recommendation: string; category: TaskCategory }; recoveryBlocks: RecoveryBlock[]; plannerMessage: string; onProtect: (id: number) => void; onLockAll: () => void; onUnlock: (id: number) => void; onUnlockAll: () => void; unlockTarget: number | "all" | null; onConfirmUnlock: () => void; onCancelUnlock: () => void; onSkip: () => void }) {
   const blocks = recoveryBlocks.length ? recoveryBlocks : [
     { id: 101, day: "Tuesday", startTime: "18:00", endTime: "19:00", type: loadPattern.category === "mental" ? "Physical break" : "Low-stimulus reset", locked: false },
     { id: 102, day: "Thursday", startTime: "18:30", endTime: "19:30", type: loadPattern.category === "social" ? "Solo time" : "Screen-free wind-down", locked: false },
@@ -1549,15 +1567,17 @@ function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtec
           <div className="planner-block-top"><span className="planner-day-pill">{block.day}</span><span className="planner-time">{block.startTime} – {block.endTime}</span></div>
           <strong>{block.type}</strong>
           <small>After 2 consecutive high-load days</small>
-          <div className="planner-block-actions">{block.locked ? <span className="locked-copy"><ShieldCheck size={15} /> Protected</span> : <><button className="secondary-button planner-action-btn" onClick={() => onProtect(block.id)}>Protect</button><button className="text-button planner-action-btn">Edit</button></>}</div>
+          <div className="planner-block-actions">{block.locked ? <><span className="locked-copy"><ShieldCheck size={15} /> Protected</span><button className="secondary-button planner-action-btn planner-unlock-button" onClick={() => onUnlock(block.id)}>Unlock</button></> : <><button className="secondary-button planner-action-btn" onClick={() => onProtect(block.id)}>Protect</button><button className="text-button planner-action-btn">Edit</button></>}</div>
         </div>)}
       </div>
     </section>
     {plannerMessage && <div className="planner-message"><Check size={16} /> {plannerMessage}</div>}
     <div className="button-stack">
-      <button className="primary-button" onClick={onLockAll}><LockKeyhole size={17} /> Lock All Suggested Blocks</button>
+      <button className="primary-button" disabled={blocks.every((block) => block.locked)} onClick={onLockAll}><LockKeyhole size={17} /> Lock All Suggested Blocks</button>
+      <button className="secondary-button planner-unlock-all-button" disabled={!blocks.some((block) => block.locked)} onClick={onUnlockAll}>Unlock All</button>
       <button className="secondary-button" onClick={onSkip}>Skip for Now</button>
     </div>
+    {unlockTarget !== null && <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="unlock-confirm-title"><div className="planner-confirm-sheet"><h2 id="unlock-confirm-title">{unlockTarget === "all" ? "Remove all recovery blocks?" : "Remove this recovery block?"}</h2><p>{unlockTarget === "all" ? "All protected recovery time this week will be released." : "This will free up the time but reduce your protected recovery for the week."}</p><div className="planner-confirm-actions"><button className="primary-button primary-button-danger" onClick={onConfirmUnlock}>{unlockTarget === "all" ? "Yes, unlock all" : "Yes, remove it"}</button><button className="secondary-button" onClick={onCancelUnlock}>{unlockTarget === "all" ? "Keep them protected" : "Keep it protected"}</button></div></div></div>}
   </div>;
 }
 
