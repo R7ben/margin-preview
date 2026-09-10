@@ -619,7 +619,7 @@ function App() {
   const isDarkScreen = screen === "mirror" || screen === "planner" || screen === "reflection" || screen === "import";
 
   return (
-    <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}`}>
+    <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}${screen === "dashboard" ? " app-shell-dashboard" : ""}`}>
       <div className="app-frame">
         <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} />
         {screen === "onboarding" ? (
