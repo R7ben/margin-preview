@@ -51,6 +51,7 @@ type TriageOutcome = "full" | "partial" | "failure" | null;
 type TaskOutcomeValue = "Easy" | "Fine" | "Hard" | "Disaster";
 type TaskOutcomeRecord = { taskId: number; taskName: string; outcome: TaskOutcomeValue; timestamp: number };
 type EnergyResponse = "Rough" | "Okay" | "Ready";
+type EnergyType = "deepFocus" | "lowEnergy" | "social" | "physical" | "maintenance";
 type EnergyCheckIn = { date: string; response: EnergyResponse };
 type MoodValue = "Drained" | "Okay" | "Good" | "Energized";
 type MoodCheckIn = { date: string; value: MoodValue };
@@ -85,6 +86,7 @@ type FlexibleTask = {
   deadline: string;
   deferred: boolean;
   category: TaskCategory;
+  energy?: EnergyType;
 };
 
 type RecoveryBlock = {
@@ -308,6 +310,24 @@ const analyzeDayRisk = (day: string, tasks: FlexibleTask[], fixedCommitments: Fi
   return { day, totalHours, load, hasRecoveryBlock, riskLevel: score > 60 ? "high" : score > 30 ? "medium" : "low", riskNarrative: stressors.length ? `${readableDay} has ${stressors.join(", ")}. Consider protecting recovery.` : `${readableDay} is manageable.` };
 };
 const analyzeWeekRisk = (tasks: FlexibleTask[], fixedCommitments: FixedCommitment[], recoveryBlocks: RecoveryBlock[]) => DAYS.map((day) => analyzeDayRisk(day, tasks, fixedCommitments, recoveryBlocks));
+const ENERGY_LABELS: Record<EnergyType, string> = { deepFocus: "Deep focus (coding, writing, analysis)", lowEnergy: "Low energy (admin, organization, simple tasks)", social: "Social (meetings, collaboration)", physical: "Physical (exercise, errands)", maintenance: "Maintenance (sleep, meals, breaks)" };
+type EnergyRecommendation = { day: string; reason: string; capacity: number } | null;
+const analyzeWeeklyEnergyCapacity = (tasks: FlexibleTask[], fixedCommitments: FixedCommitment[], recoveryBlocks: RecoveryBlock[]) => Object.fromEntries(DAYS.map((day) => {
+  const dayTasks = tasks.filter((task) => !task.deferred && task.deadline.toLowerCase().startsWith(day.toLowerCase().slice(0, 3)));
+  const fixed = fixedCommitments.filter((commitment) => commitment.days.some((commitmentDay) => commitmentDay.toLowerCase().startsWith(day.toLowerCase().slice(0, 3))));
+  const mentalLoad = dayTasks.filter((task) => (task.energy ?? (task.category === "mental" ? "deepFocus" : "lowEnergy")) === "deepFocus").length;
+  const socialLoad = dayTasks.filter((task) => (task.energy ?? task.category) === "social").length + fixed.length;
+  const hasRecovery = recoveryBlocks.some((block) => block.locked && block.day.toLowerCase().startsWith(day.toLowerCase().slice(0, 3)));
+  return [day, { deepFocus: Math.max(0, (mentalLoad < 2 && fixed.length === 0) ? 3 : 1), lowEnergy: hasRecovery ? 2 : 1, social: Math.max(0, 3 - socialLoad), physical: mentalLoad < 2 ? 2 : 1, maintenance: hasRecovery ? 3 : 1 }];
+})) as Record<string, Record<EnergyType, number>>;
+const recommendBestEnergySlot = (energy: EnergyType, tasks: FlexibleTask[], fixedCommitments: FixedCommitment[], recoveryBlocks: RecoveryBlock[]): EnergyRecommendation => {
+  const capacity = analyzeWeeklyEnergyCapacity(tasks, fixedCommitments, recoveryBlocks);
+  const best = DAYS.map((day) => ({ day, score: capacity[day][energy] })).sort((a, b) => b.score - a.score)[0];
+  if (!best || best.score <= 0) return null;
+  const time = energy === "deepFocus" ? "morning" : energy === "physical" ? "afternoon" : energy === "lowEnergy" || energy === "maintenance" ? "after your recovery block" : "available collaboration time";
+  const reasons: Record<EnergyType, string> = { deepFocus: `This needs uninterrupted focus. ${best.day} ${time} is clear with high mental capacity.`, lowEnergy: `This is routine work. ${best.day} has a calm slot after recovery.`, social: `This needs collaboration energy. ${best.day} has available social capacity.`, physical: `This is movement-based. ${best.day} ${time} fits before evening wind-down.`, maintenance: `Protect maintenance time on ${best.day}; recovery capacity is available.` };
+  return { day: best.day, reason: reasons[energy], capacity: best.score };
+};
 
 const statusFor = (margin: number) => {
   if (margin < 0) return { label: "Breached", color: "#8B0000", soft: "#FFF5F5", copy: "Recovery floor exceeded" };
@@ -613,6 +633,7 @@ function App() {
   const [draftName, setDraftName] = useState("");
   const [draftHours, setDraftHours] = useState(1);
   const [draftDeadline, setDraftDeadline] = useState("Thu");
+  const [draftEnergy, setDraftEnergy] = useState<EnergyType>("deepFocus");
   const [draftEstimateTouched, setDraftEstimateTouched] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [confirmBreach, setConfirmBreach] = useState(false);
@@ -737,6 +758,7 @@ function App() {
       deadline: draftDeadline,
       deferred,
       category: suggestion.category,
+      energy: draftEnergy,
     };
     const nextOverrideCount = isOverride ? overrideCount + 1 : overrideCount;
     setTasks((current) => [...current, task]);
@@ -1062,6 +1084,10 @@ function App() {
                   sleepImpact={sleepImpact}
                   predictedHighLoadDays={predictedHighLoadDays}
                   sleepHours={sleepHours}
+                  energyType={draftEnergy}
+                  setEnergyType={setDraftEnergy}
+                  energyRecommendation={recommendBestEnergySlot(draftEnergy, tasks, fixedCommitments, recoveryBlocks)}
+                  onAcceptEnergyRecommendation={(day) => { setDraftDeadline(day); addTask(false); }}
                   showActions={showActions}
                   confirmBreach={confirmBreach}
                   setDraftName={(value) => { setDraftName(value); setDraftEstimateTouched(false); }}
@@ -1522,7 +1548,7 @@ type CalculationShape = { fixedTotal: number; recoveryBlockTotal: number; tier2T
 type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
 const useCalculationShape = null as unknown as () => CalculationShape;
 
-function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargin, projectedStatus, consequenceDay, dailyBreachAmount, sleepImpact, predictedHighLoadDays, sleepHours, showActions, confirmBreach, setDraftName, setDraftHours, setDraftDeadline, setShowActions, onAddAnyway, onTriage, onSplit, onFindSlot, onDefer, onChooseOption }: { draftName: string; draftHours: number; draftDeadline: string; projectedMargin: number; projectedStatus: ReturnType<typeof statusFor>; consequenceDay: string; dailyBreachAmount: number; sleepImpact: number; predictedHighLoadDays: number; sleepHours: number; showActions: boolean; confirmBreach: boolean; setDraftName: (value: string) => void; setDraftHours: (value: number) => void; setDraftDeadline: (value: string) => void; setShowActions: (value: boolean) => void; onAddAnyway: () => void; onTriage: () => void; onSplit: () => void; onFindSlot: () => void; onDefer: () => void; onChooseOption: (option: "addAnyway" | "split" | "defer" | "decline") => void }) {
+function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargin, projectedStatus, consequenceDay, dailyBreachAmount, sleepImpact, predictedHighLoadDays, sleepHours, energyType, setEnergyType, energyRecommendation, onAcceptEnergyRecommendation, showActions, confirmBreach, setDraftName, setDraftHours, setDraftDeadline, setShowActions, onAddAnyway, onTriage, onSplit, onFindSlot, onDefer, onChooseOption }: { draftName: string; draftHours: number; draftDeadline: string; projectedMargin: number; projectedStatus: ReturnType<typeof statusFor>; consequenceDay: string; dailyBreachAmount: number; sleepImpact: number; predictedHighLoadDays: number; sleepHours: number; energyType: EnergyType; setEnergyType: (value: EnergyType) => void; energyRecommendation: EnergyRecommendation; onAcceptEnergyRecommendation: (day: string) => void; showActions: boolean; confirmBreach: boolean; setDraftName: (value: string) => void; setDraftHours: (value: number) => void; setDraftDeadline: (value: string) => void; setShowActions: (value: boolean) => void; onAddAnyway: () => void; onTriage: () => void; onSplit: () => void; onFindSlot: () => void; onDefer: () => void; onChooseOption: (option: "addAnyway" | "split" | "defer" | "decline") => void }) {
   const [showSimulator, setShowSimulator] = useState(false);
   const [simulationResults, setSimulationResults] = useState<Record<string, { title: string; description: string; margin: number; status: "good" | "okay" | "tight"; sleep: number; recovery: string }>>({});
   useEffect(() => {
@@ -1612,6 +1638,8 @@ function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargi
       <div className="section-kicker"><span>Input</span></div>
       <div className="quick-add-grid">{QUICK_ADD_PRESETS.map((preset) => { const Icon = categoryIcon(suggestionFor(preset.name).category); return <button key={preset.name} type="button" className="quick-add-tile" onClick={() => { setDraftName(preset.name); setDraftHours(preset.hours); }}><Icon size={15} /><span><strong>{preset.name}</strong><small>{formatShortHours(preset.hours)} · {preset.displayCategory}</small></span></button>; })}</div>
       <label className="field-label">Other task/commitment?<div className="task-input-group"><input autoFocus className="task-input" placeholder="Type here..." value={draftName} onChange={(event) => setDraftName(event.target.value)} /><button type="button" className={`mic-button${isListening ? " listening" : ""}`} onClick={startSpeechRecognition} title={speechSupported ? "Speak your task" : "Speech not supported"} aria-label="Speak your task" disabled={!speechSupported}>🎤</button></div>{isListening && <div className="listening-indicator">🎙️ Listening...</div>}{!speechSupported && <div className="speech-support-note">Speech not supported on this device</div>}</label>
+      <div className="energy-selector"><span className="field-label">Task requires:</span>{(Object.keys(ENERGY_LABELS) as EnergyType[]).map((type) => <label key={type}><input type="radio" name="energy" value={type} checked={energyType === type} onChange={() => setEnergyType(type)} />{ENERGY_LABELS[type]}</label>)}</div>
+      {draftName.trim() && energyRecommendation && <div className="energy-recommendation"><h4>✨ Smart Suggestion</h4><p>{energyRecommendation.reason}</p><div className="recommendation-buttons"><button type="button" className="btn-primary" onClick={() => onAcceptEnergyRecommendation(energyRecommendation.day)}>Schedule on {energyRecommendation.day}</button><button type="button" className="btn-secondary" onClick={() => setDraftDeadline(draftDeadline)}>Choose different day</button></div></div>}
       <div className="mirror-field-row">
         <label className="field-label">Est time<input className="number-input" type="number" min="0.5" step="0.5" value={draftHours} onChange={(event) => setDraftHours(Number(event.target.value))} /></label>
         <label className="field-label">Day<select className="text-input" value={draftDeadline} onChange={(event) => setDraftDeadline(event.target.value)}>{DAYS.map((day) => <option key={day} value={day}>{day}</option>)}</select></label>

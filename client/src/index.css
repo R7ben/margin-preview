@@ -471,6 +471,17 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .listening-indicator { display: flex; align-items: center; gap: 4px; margin-top: 8px; color: #1D9E75; font-size: 12px; }
 .speech-support-note { margin-top: 7px; color: #C1121F; font-size: 11px; }
 .mirror-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.energy-selector { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.energy-selector > .field-label { color: #1F2937; font-size: 12px; font-weight: 600; }
+.energy-selector label { color: #6B7280; font-size: 11px; }
+.energy-selector input[type="radio"] { margin-right: 8px; accent-color: #1D9E75; }
+.energy-recommendation { margin: 12px 0; padding: 12px; border-left: 3px solid #1D9E75; border-radius: 8px; background: rgba(29,158,117,.08); }
+.energy-recommendation h4 { margin: 0 0 8px; color: #1D9E75; font-size: 14px; }
+.energy-recommendation p { margin: 0 0 12px; color: #374151; font-size: 13px; line-height: 1.45; }
+.recommendation-buttons { display: flex; gap: 8px; }
+.recommendation-buttons button { flex: 1; min-height: 36px; padding: 7px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+.btn-primary { color: white; border: 1px solid #1D9E75; background: #1D9E75; }
+.btn-secondary { color: #1D9E75; border: 1px solid #1D9E75; background: transparent; }
 .number-input { width: 100%; min-height: 46px; }
 .primary-button-danger { background: var(--coral); }
 .primary-button-danger:hover { background: #B93E2F; }
