@@ -20,6 +20,7 @@ import {
   Clock3,
   Dumbbell,
   FileText,
+  Home,
   Info,
   Leaf,
   LockKeyhole,
@@ -371,6 +372,14 @@ function App() {
   const [taskOutcomes, setTaskOutcomes] = useState<TaskOutcomeRecord[]>([]);
   const [energyCheckIns, setEnergyCheckIns] = useState<EnergyCheckIn[]>([]);
   const [moodCheckIns, setMoodCheckIns] = useState<MoodCheckIn[]>([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setDrawerOpen(false); };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [drawerOpen]);
 
   const todayKey = new Date().toDateString();
   const showMorningCheckIn = !moodCheckIns.some((entry) => entry.date === todayKey);
@@ -639,7 +648,7 @@ function App() {
                 />
         ) : (
           <>
-            <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} />
+            <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} />
             <main className="page-wrap">
               {screen === "dashboard" && (
                 <Dashboard
@@ -771,15 +780,46 @@ function App() {
           />
         )}
       </div>
+      <NavDrawer open={drawerOpen} activeScreen={screen} onNavigate={(next) => { navTo(next); setDrawerOpen(false); }} onClose={() => setDrawerOpen(false)} />
     </div>
   );
 }
 
-function Header({ screen, isDark, onBack }: { screen: Screen; isDark: boolean; onBack: () => void }) {
+const NAV_ITEMS: { id: Screen; label: string; icon: ReactNode }[] = [
+  { id: "dashboard", label: "Today", icon: <Home size={18} /> },
+  { id: "mirror", label: "Add Task", icon: <Plus size={18} /> },
+  { id: "planner", label: "Recovery Planner", icon: <Moon size={18} /> },
+  { id: "reflection", label: "Weekly Reflection", icon: <BarChart3 size={18} /> },
+  { id: "import", label: "Import Schedule", icon: <Upload size={18} /> },
+  { id: "onboarding", label: "Recovery Floor Setup", icon: <ShieldCheck size={18} /> },
+];
+
+function NavDrawer({ open, activeScreen, onNavigate, onClose }: { open: boolean; activeScreen: Screen; onNavigate: (screen: Screen) => void; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="nav-drawer-backdrop" onClick={onClose}>
+      <aside className="nav-drawer" role="dialog" aria-modal="true" aria-label="Navigation" onClick={(event) => event.stopPropagation()}>
+        <div className="nav-drawer-head">
+          <div className="brand-lockup"><BrandMark className="brand-mark" /><span className="brand-wordmark">MARGIN</span></div>
+          <button className="icon-button" aria-label="Close menu" onClick={onClose}><X size={18} /></button>
+        </div>
+        <nav className="nav-drawer-list">
+          {NAV_ITEMS.map((item) => (
+            <button key={item.id} className={`nav-drawer-item ${activeScreen === item.id ? "nav-drawer-item-active" : ""}`} onClick={() => onNavigate(item.id)}>
+              {item.icon}<span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+      </aside>
+    </div>
+  );
+}
+
+function Header({ screen, isDark, onBack, onMenu }: { screen: Screen; isDark: boolean; onBack: () => void; onMenu: () => void }) {
   return (
     <header className={`topbar ${isDark ? "topbar-dark" : "topbar-light"}`}>
       <div className="topbar-inner">
-        <button className="hamburger-btn" aria-label="Menu" onClick={onBack}><Menu size={20} /></button>
+        <button className="hamburger-btn" aria-label="Menu" onClick={onMenu}><Menu size={20} /></button>
         <div className="brand-lockup">
           <BrandMark className="brand-mark" />
           <span className="brand-wordmark">MARGIN</span>
