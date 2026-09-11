@@ -676,6 +676,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .chat-bubble-loading { opacity: .65; }
 .chat-bubble-error { background: var(--pill-coral-bg); border-color: rgba(209,79,62,.3); color: var(--pill-coral-text); }
 .chat-bubble-error svg { color: var(--coral); }
+.chat-truncation-notice { display: block; flex-basis: 100%; margin-top: 7px; padding-top: 7px; border-top: 1px solid currentColor; opacity: .78; font-size: 11px; font-weight: 600; }
 .chat-input-row { display: flex; gap: 8px; margin-top: 12px; }
 .chat-input-row .text-input { flex: 1; }
 

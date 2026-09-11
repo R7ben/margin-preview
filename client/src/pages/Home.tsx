@@ -59,7 +59,7 @@ type EnergyType = "deepFocus" | "lowEnergy" | "social" | "physical" | "maintenan
 type EnergyCheckIn = { date: string; response: EnergyResponse };
 type MoodValue = "Drained" | "Okay" | "Good" | "Energized";
 type MoodCheckIn = { date: string; value: MoodValue };
-type ChatMessage = { role: "user" | "assistant"; content: string; isError?: boolean };
+type ChatMessage = { role: "user" | "assistant"; content: string; isError?: boolean; isTruncated?: boolean };
 type RiskAssessment = { score: number; label: "Low" | "Moderate" | "High" | "Critical"; trend: "improving" | "stable" | "worsening"; trendSlope: number };
 
 type FixedCommitment = {
@@ -2285,6 +2285,7 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
 
     setChatLoading(true);
     const systemPreamble = `You are Margin, a recovery-first student planning assistant. Using ONLY the real data below, answer the student's question in 2-3 short sentences. Tell them honestly whether their Recovery Margin is comfortable, tight, or in deficit. If tight or in deficit, name one specific task they could defer. Be direct, warm, and brief — no bullet points, no headers, never invent facts not present below.\n\n${context}`;
+    if (import.meta.env.DEV) console.log("[Quick Check] prompt characters:", systemPreamble.length);
     try {
       if (!apiKey) throw new Error("missing API key");
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
@@ -2296,14 +2297,16 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
             { role: "model", parts: [{ text: "Understood. I'll answer using only this student's real schedule and check-in data." }] },
             ...nextMessages.map((message) => ({ role: message.role === "user" ? "user" : "model", parts: [{ text: message.content }] })),
           ],
-          generationConfig: { maxOutputTokens: 160, temperature: 0.6 },
+          generationConfig: { maxOutputTokens: 512, temperature: 0.6 },
         }),
       });
       if (!response.ok) throw new Error("bad response");
       const data = await response.json();
+      const finishReason = data?.candidates?.[0]?.finishReason;
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (finishReason !== "STOP" && finishReason !== "MAX_TOKENS") throw new Error("invalid finish reason");
       if (!text) throw new Error("empty response");
-      setChatMessages([...nextMessages, { role: "assistant", content: String(text).trim() }]);
+      setChatMessages([...nextMessages, { role: "assistant", content: String(text).trim(), isTruncated: finishReason === "MAX_TOKENS" }]);
     } catch (error) {
       const message = error instanceof Error && error.message === "missing API key"
         ? "Gemini isn't configured for this preview — add VITE_GEMINI_API_KEY to enable AI replies."
@@ -2357,7 +2360,7 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
             <div className="chat-bubble chat-bubble-assistant"><Sparkles size={14} /> Ask me anything about your week — whether a task fits, what's driving your risk, or how you're trending.</div>
           )}
           {chatMessages.map((message, index) => (
-            <div key={index} className={`chat-bubble ${message.role === "user" ? "chat-bubble-user" : "chat-bubble-assistant"} ${message.isError ? "chat-bubble-error" : ""}`}>{message.role === "assistant" && <Sparkles size={14} />} {message.content}</div>
+            <div key={index} className={`chat-bubble ${message.role === "user" ? "chat-bubble-user" : "chat-bubble-assistant"} ${message.isError ? "chat-bubble-error" : ""}`}>{message.role === "assistant" && <Sparkles size={14} />}<span>{message.content}</span>{message.isTruncated && <small className="chat-truncation-notice">Answer was cut short — try asking a narrower question.</small>}</div>
           ))}
           {chatLoading && <div className="chat-bubble chat-bubble-assistant chat-bubble-loading"><Spinner className="size-3.5" /> Reading your schedule...</div>}
         </div>
