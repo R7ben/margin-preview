@@ -397,6 +397,18 @@ const analyzeDayRisk = (day: string, tasks: FlexibleTask[], fixedCommitments: Fi
   return { day, totalHours, load, hasRecoveryBlock, riskLevel: score > 60 ? "high" : score > 30 ? "medium" : "low", riskNarrative: stressors.length ? `${readableDay} has ${stressors.join(", ")}. Consider protecting recovery.` : `${readableDay} is manageable.` };
 };
 const analyzeWeekRisk = (tasks: FlexibleTask[], fixedCommitments: FixedCommitment[], recoveryBlocks: RecoveryBlock[]) => DAYS.map((day) => analyzeDayRisk(day, tasks, fixedCommitments, recoveryBlocks));
+type WeeklyRiskSummary = { isAtRisk: boolean; hoursAtRisk: number; hardestDay: string; reason: string };
+const getWeeklyRiskSummary = (tasks: FlexibleTask[], fixedCommitments: FixedCommitment[], recoveryBlocks: RecoveryBlock[], calculation: CalculationShape): WeeklyRiskSummary => {
+  const riskDays = analyzeWeekRisk(tasks, fixedCommitments, recoveryBlocks).filter((day) => day.riskLevel !== "low");
+  const hardestDay = riskDays.sort((a, b) => b.totalHours - a.totalHours)[0] ?? analyzeWeekRisk(tasks, fixedCommitments, recoveryBlocks).sort((a, b) => a.totalHours - b.totalHours).at(-1);
+  const isAtRisk = calculation.margin <= 5 || riskDays.length > 0;
+  return {
+    isAtRisk,
+    hoursAtRisk: Math.max(0, Math.round((5 - calculation.margin) * 10) / 10),
+    hardestDay: hardestDay ? fullDayName(hardestDay.day) : "Your week",
+    reason: hardestDay?.riskNarrative.replace(`${fullDayName(hardestDay.day)} has `, "").replace(/\. Consider protecting recovery\.$/, "") ?? "your recovery margin is getting narrow",
+  };
+};
 const ENERGY_LABELS: Record<EnergyType, string> = { deepFocus: "Deep focus (coding, writing, analysis)", lowEnergy: "Low energy (admin, organization, simple tasks)", social: "Social (meetings, collaboration)", physical: "Physical (exercise, errands)", maintenance: "Maintenance (sleep, meals, breaks)" };
 type EnergyRecommendation = { day: string; reason: string; capacity: number } | null;
 const analyzeWeeklyEnergyCapacity = (tasks: FlexibleTask[], fixedCommitments: FixedCommitment[], recoveryBlocks: RecoveryBlock[]) => Object.fromEntries(DAYS.map((day) => {
@@ -740,6 +752,10 @@ function TaskQuickAddToast({ presets, onQuickAdd, onSubmitOther, onClose }: { pr
   );
 }
 
+function RiskNotificationToast({ risk, availableHours, onCheckWeek, onAddTask, onClose }: { risk: WeeklyRiskSummary; availableHours: number; onCheckWeek: () => void; onAddTask: () => void; onClose: () => void }) {
+  return <div className="risk-toast" role="status" aria-live="polite"><div className="risk-toast-head"><strong>{risk.isAtRisk ? `⚠️ You&apos;re risking ${formatShortHours(risk.hoursAtRisk)} of recovery this week` : `✓ Recovery margin steady — ${formatShortHours(availableHours)} available this week`}</strong><button className="icon-button" aria-label="Close recovery check-in" onClick={onClose}><X size={16} /></button></div>{risk.isAtRisk && <p className="risk-toast-detail">{risk.hardestDay} is tightest — {risk.reason}.</p>}<div className="risk-toast-actions"><button className="secondary-button" onClick={onCheckWeek}>Check my week</button><button className="text-button" onClick={onAddTask}>Add a task</button></div></div>;
+}
+
 // Retrieval step of the RAG loop: pulls the student's own locally-stored data (schedule, check-ins,
 // outcomes) into a structured context block so the model answers from real facts, not invented ones.
 const buildUserContext = ({ calculation, tasks, moodCheckIns, energyCheckIns, taskOutcomes, sleepHours, decompHours, risk }: { calculation: CalculationShape; tasks: FlexibleTask[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; taskOutcomes: TaskOutcomeRecord[]; sleepHours: number; decompHours: number; risk: RiskAssessment }) => {
@@ -816,6 +832,7 @@ function App() {
   });
   const [demoNotificationToken, setDemoNotificationToken] = useState(0);
   const [showMoodToast, setShowMoodToast] = useState(false);
+  const [showRiskToast, setShowRiskToast] = useState(false);
   const [showTaskToast, setShowTaskToast] = useState(false);
   const [lastToastTaskId, setLastToastTaskId] = useState<number | null>(null);
   const lastToastTaskIdRef = useRef<number | null>(null);
@@ -855,6 +872,7 @@ function App() {
 
   const showTaskPrompt = () => {
     if (showMoodToast) return;
+    setShowRiskToast(false);
     const shuffled = [...QUICK_ADD_PRESETS].sort(() => Math.random() - 0.5);
     setTaskToastPresets(shuffled.slice(0, 3));
     setShowTaskToast(true);
@@ -863,17 +881,25 @@ function App() {
     taskToastTimerRef.current = setTimeout(() => setShowTaskToast(false), 10000);
   };
 
+  const showRiskPrompt = () => {
+    if (showMoodToast) return;
+    setShowRiskToast(true);
+    if (typeof window !== "undefined") window.localStorage.setItem("last-task-toast-time", String(Date.now()));
+  };
+
   const dismissTaskPrompt = () => {
     if (taskToastTimerRef.current) clearTimeout(taskToastTimerRef.current);
     setShowTaskToast(false);
   };
+
+  const dismissRiskPrompt = () => setShowRiskToast(false);
 
   useEffect(() => () => {
     if (taskToastTimerRef.current) clearTimeout(taskToastTimerRef.current);
   }, []);
 
   useEffect(() => {
-    if (showTaskToast) return;
+    if (showTaskToast || showRiskToast) return;
     if (typeof window !== "undefined" && JSON.parse(window.localStorage.getItem("task-toast-enabled") ?? "true") === false) return;
     const interval = typeof window !== "undefined" ? window.localStorage.getItem("task-toast-interval") ?? "4" : "4";
     if (interval === "manual") return;
@@ -887,10 +913,10 @@ function App() {
     const scheduledEligible = interval === "once" ? now.getTime() >= todayAt(9) && (!lastDate || lastDate.getTime() < todayAt(9)) : interval === "twice" ? (now.getTime() >= todayAt(17) && (!lastDate || lastDate.getTime() < todayAt(17))) || (now.getTime() >= todayAt(9) && (!lastDate || lastDate.getTime() < todayAt(9))) : false;
     const eligible = interval === "once" || interval === "twice" ? scheduledEligible : !lastShown || Date.now() - lastShown >= Number(interval) * 60 * 60 * 1000;
     if (!eligible) return;
-    showTaskPrompt();
+    showRiskPrompt();
     // Navigation re-evaluates eligibility without stacking with the mood toast.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen, showMoodToast, showTaskToast]);
+  }, [screen, showMoodToast, showRiskToast, showTaskToast]);
 
   const todayKey = new Date().toDateString();
   const showMorningCheckIn = true;
@@ -922,6 +948,7 @@ function App() {
     };
     return { fixedTotal, recoveryBlockTotal, tier2Total, availableCapacity, flexTotal, margin, dailyMargins, dailyFixed, dailyRecoveryBlocks, dailyTask, longestRun, distributionWarning, status, categoryBreakdown };
   }, [decompHours, fixedCommitments, recoveryBlocks, sleepHours, tasks]);
+  const notificationRisk = useMemo(() => getWeeklyRiskSummary(tasks, fixedCommitments, recoveryBlocks, calculation), [calculation, fixedCommitments, recoveryBlocks, tasks]);
 
   const draftSuggestion = useMemo(() => suggestionFor(draftName), [draftName]);
   const quickSuggestion = useMemo(() => suggestionFor(quickName), [quickName]);
@@ -1303,10 +1330,11 @@ function App() {
   return (
     <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}${screen === "dashboard" ? " app-shell-dashboard" : ""}`}>
       <div className="app-frame">
-        <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} onShowRecoveryMenu={() => setShowRecoveryMenu(true)} demoTrigger={demoNotificationToken} blocked={showTaskToast} onVisibilityChange={setShowMoodToast} />
+        <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} onShowRecoveryMenu={() => setShowRecoveryMenu(true)} demoTrigger={demoNotificationToken} blocked={showRiskToast || showTaskToast} onVisibilityChange={setShowMoodToast} />
+        {showRiskToast && !showMoodToast && !showTaskToast && <RiskNotificationToast risk={notificationRisk} availableHours={calculation.availableCapacity} onCheckWeek={() => { dismissRiskPrompt(); navTo("dashboard"); }} onAddTask={() => { dismissRiskPrompt(); showTaskPrompt(); }} onClose={dismissRiskPrompt} />}
         {showTaskToast && !showMoodToast && <TaskQuickAddToast presets={taskToastPresets} onQuickAdd={handleToastQuickAdd} onSubmitOther={handleToastOtherSubmit} onClose={dismissTaskPrompt} />}
         {checkInNotice && <div className="checkin-log-toast" role="status" aria-live="polite">{checkInNotice}</div>}
-        <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} onHelp={() => navTo("guide")} onTestNotification={() => setDemoNotificationToken((token) => token + 1)} onTestTaskPrompt={showTaskPrompt} />
+        <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} onHelp={() => navTo("guide")} onTestNotification={() => setDemoNotificationToken((token) => token + 1)} onTestTaskPrompt={showRiskPrompt} />
         {/* Keep this host mounted across navigation; remounting it by screen key can duplicate transition content. */}
         <div className="screen-container">
         {screen === "onboarding" ? (
@@ -2131,7 +2159,7 @@ function Settings({ onBack }: { onBack: () => void }) {
     toast.success("Settings saved");
   };
   const intervalOptions = [{ value: "2", label: "Every 2 hours" }, { value: "4", label: "Every 4 hours" }, { value: "6", label: "Every 6 hours" }, { value: "twice", label: "Twice a day (9am, 5pm)" }, { value: "once", label: "Once a day (9am)" }, { value: "manual", label: "Manual only (I'll check in)" }];
-  return <div className="settings-screen"><div className="settings-heading"><button className="text-button settings-back-button" onClick={onBack}><ArrowLeft size={14} /> Settings</button><h1>Settings</h1></div><section className="card settings-card"><span className="card-label">Appearance</span><div className="settings-group"><span className="settings-option-label">Theme</span><div className="theme-options"><button className={`theme-option ${theme === "light" ? "active" : ""}`} onClick={() => theme !== "light" && toggleTheme()}>☀️ Light</button><button className={`theme-option ${theme === "dark" ? "active" : ""}`} onClick={() => theme !== "dark" && toggleTheme()}>🌙 Dark</button></div><p className="settings-hint">Dark mode reduces eye strain before bed.</p></div><span className="card-label">Notifications</span><label className="settings-toggle-row"><span><strong>Mood Check Reminders</strong><small>Prompt you to log how you feel.</small></span><input type="checkbox" checked={notificationsEnabled} onChange={(event) => setNotificationsEnabled(event.target.checked)} /></label><div className="settings-option-group"><span className="settings-option-label">How often?</span><div className="interval-options">{intervalOptions.map((option) => <label key={`mood-${option.value}`}><input type="radio" name="notification-interval" value={option.value} checked={reminderInterval === option.value} onChange={(event) => setReminderInterval(event.target.value)} />{option.label}</label>)}</div></div><div className="settings-notification-block"><label className="settings-toggle-row"><span><strong>Task Prompts</strong><small>Prompt you to add tasks without opening Add Task.</small></span><input type="checkbox" checked={taskPromptsEnabled} onChange={(event) => setTaskPromptsEnabled(event.target.checked)} /></label><div className="settings-option-group"><span className="settings-option-label">How often?</span><div className="interval-options">{intervalOptions.map((option) => <label key={`task-${option.value}`}><input type="radio" name="task-toast-interval" value={option.value} checked={taskPromptInterval === option.value} onChange={(event) => setTaskPromptInterval(event.target.value)} />{option.label}</label>)}</div></div></div><button className="primary-button" onClick={handleSave}>Save preferences</button></section></div>;
+  return <div className="settings-screen"><div className="settings-heading"><button className="text-button settings-back-button" onClick={onBack}><ArrowLeft size={14} /> Settings</button><h1>Settings</h1></div><section className="card settings-card"><span className="card-label">Appearance</span><div className="settings-group"><span className="settings-option-label">Theme</span><div className="theme-options"><button className={`theme-option ${theme === "light" ? "active" : ""}`} onClick={() => theme !== "light" && toggleTheme()}>☀️ Light</button><button className={`theme-option ${theme === "dark" ? "active" : ""}`} onClick={() => theme !== "dark" && toggleTheme()}>🌙 Dark</button></div><p className="settings-hint">Dark mode reduces eye strain before bed.</p></div><span className="card-label">Notifications</span><label className="settings-toggle-row"><span><strong>Mood Check Reminders</strong><small>Prompt you to log how you feel.</small></span><input type="checkbox" checked={notificationsEnabled} onChange={(event) => setNotificationsEnabled(event.target.checked)} /></label><div className="settings-option-group"><span className="settings-option-label">How often?</span><div className="interval-options">{intervalOptions.map((option) => <label key={`mood-${option.value}`}><input type="radio" name="notification-interval" value={option.value} checked={reminderInterval === option.value} onChange={(event) => setReminderInterval(event.target.value)} />{option.label}</label>)}</div></div><div className="settings-notification-block"><label className="settings-toggle-row"><span><strong>Recovery Check-ins</strong><small>Get notified about your recovery margin and easy ways to add tasks.</small></span><input type="checkbox" checked={taskPromptsEnabled} onChange={(event) => setTaskPromptsEnabled(event.target.checked)} /></label><div className="settings-option-group"><span className="settings-option-label">How often?</span><div className="interval-options">{intervalOptions.map((option) => <label key={`task-${option.value}`}><input type="radio" name="task-toast-interval" value={option.value} checked={taskPromptInterval === option.value} onChange={(event) => setTaskPromptInterval(event.target.value)} />{option.label}</label>)}</div></div></div><button className="primary-button" onClick={handleSave}>Save preferences</button></section></div>;
 }
 
 function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, energyCheckIns, recoveryBlocks, onNextWeek, onAdjust }: { calculation: CalculationShape; overrideCount: number; taskOutcomes: TaskOutcomeRecord[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; recoveryBlocks: RecoveryBlock[]; onNextWeek: () => void; onAdjust: () => void }) {

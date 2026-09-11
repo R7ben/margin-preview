@@ -951,6 +951,13 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .task-toast-other-row .text-input::placeholder { color: rgba(255,255,255,.7); }
 .task-toast-submit { width: 30px; height: 30px; flex: 0 0 30px; }
 .task-toast-submit:disabled { opacity: .4; cursor: not-allowed; }
+.risk-toast { position: fixed; top: env(safe-area-inset-top); left: 50%; z-index: 100; display: flex; width: 100%; max-width: 430px; flex-direction: column; gap: 10px; padding: 14px 16px; color: white; background: #0b2e2b; box-shadow: 0 4px 12px rgba(0,0,0,.15); transform: translateX(-50%); animation: toastSlideDown 300ms ease-out; }
+.risk-toast-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 1.35; }
+.risk-toast-head .icon-button { flex: 0 0 auto; color: white; }
+.risk-toast-detail { margin: 0; color: rgba(255,255,255,.85); font-size: 12px; line-height: 1.4; }
+.risk-toast-actions { display: flex; align-items: center; gap: 8px; }
+.risk-toast-actions .secondary-button { min-height: 32px; padding: 6px 11px; color: white; border-color: rgba(255,255,255,.4); background: rgba(255,255,255,.08); font-size: 12px; }
+.risk-toast-actions .text-button { padding: 6px 4px; color: white; font-size: 12px; }
 .settings-notification-block { padding-top: 8px; border-top: 1px solid var(--border-crisp); }
 .lockin-note { display: flex; align-items: center; gap: 8px; margin: -4px 0 12px; padding: 9px 10px; color: var(--text-secondary); border: 1px solid var(--border-crisp); border-radius: 8px; background: var(--surface-soft); font-size: 12px; }
 .lockin-note span { flex: 1; }
