@@ -396,6 +396,10 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .task-row .due-label-critical { color: #D14F3E; }
 .task-row .due-label-urgent { color: #EF9F27; }
 .task-row .due-label-normal, .task-row .due-label-flexible { color: var(--text-secondary); }
+.deadline-summary { display: inline; margin: 0; padding: 0; color: inherit; border: 0; background: transparent; font-size: inherit; font-style: inherit; cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
+.deadline-summary-critical, .deadline-summary-urgent { color: #C1121F; font-weight: 600; }
+.deadline-sentence { margin: 4px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.4; }
+.task-row-urgent .deadline-sentence { color: #C1121F; font-weight: 500; }
 .empty-state { display: flex; align-items: center; gap: 10px; padding: 24px 0; color: var(--text-secondary); font-size: 12px; }
 .lock-in-panel .task-list { margin-top: 12px; }
 .lock-in-legend { display: flex; align-items: center; gap: 10px; margin-top: 4px; color: var(--text-secondary); font-size: 10px; }

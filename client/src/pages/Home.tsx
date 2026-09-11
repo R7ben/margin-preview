@@ -482,6 +482,27 @@ const dueLabelForTask = (deadline: string | undefined, today = new Date()) => {
   if (daysUntil === 1) return { label: "tomorrow", urgency: tier };
   return { label: dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }), urgency: tier };
 };
+const calculateDeadlinePressure = (task: FlexibleTask, dailyMargins: number[]) => {
+  const todayDayIndex = (new Date().getDay() + 6) % 7;
+  const deadlineIndex = DAYS.findIndex((day) => day.toLowerCase() === task.deadline.trim().toLowerCase().slice(0, 3));
+  if (deadlineIndex < 0) return { daysRemaining: 0, requiredMinutesPerDay: Math.ceil(task.estimatedHours * 60), unsafeDays: [] as string[] };
+  const daysRemaining = deadlineIndex >= todayDayIndex ? deadlineIndex - todayDayIndex : 7 - todayDayIndex + deadlineIndex;
+  const requiredMinutesPerDay = daysRemaining > 0 ? Math.ceil((task.estimatedHours * 60) / daysRemaining) : Math.ceil(task.estimatedHours * 60);
+  const unsafeDays: string[] = [];
+  for (let offset = 0; offset <= daysRemaining; offset += 1) {
+    const dayIndex = (todayDayIndex + offset) % 7;
+    if (dailyMargins[dayIndex] < 5) unsafeDays.push(DAYS[dayIndex]);
+  }
+  return { daysRemaining, requiredMinutesPerDay, unsafeDays };
+};
+const formatDeadlineSentence = (task: FlexibleTask, pressure: ReturnType<typeof calculateDeadlinePressure>) => {
+  const { daysRemaining, requiredMinutesPerDay, unsafeDays } = pressure;
+  if (daysRemaining === 0) return `${task.name} due today.`;
+  const paceText = requiredMinutesPerDay >= 60 ? `${(requiredMinutesPerDay / 60).toFixed(1)}h/day` : `${requiredMinutesPerDay} min/day`;
+  const dayWord = daysRemaining === 1 ? "day" : "days";
+  if (unsafeDays.length) return `${task.name} due in ${daysRemaining} ${dayWord} — you need ${paceText}, but ${unsafeDays.join(", ")} ${unsafeDays.length > 1 ? "are" : "is"} unsafe.`;
+  return `${task.name} due in ${daysRemaining} ${dayWord} — ${paceText} keeps you on track.`;
+};
 
 const nextRecoveryBlock = (blocks: RecoveryBlock[]) => {
   const locked = blocks.filter((block) => block.locked);
@@ -1436,6 +1457,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
   const [dailyView, setDailyView] = useState<"week" | "day">("week");
   const [dailyDate, setDailyDate] = useState(() => new Date());
   const [pendingOutcomeId, setPendingOutcomeId] = useState<number | null>(null);
+  const [expandedDeadlineIds, setExpandedDeadlineIds] = useState<number[]>([]);
   const pendingOutcomeIdRef = useRef<number | null>(null);
   useEffect(() => { pendingOutcomeIdRef.current = pendingOutcomeId; }, [pendingOutcomeId]);
   const [showFabHint, setShowFabHint] = useState(() => typeof window !== "undefined" && !window.localStorage.getItem("marginFabHintSeen"));
@@ -1498,9 +1520,12 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
   const renderTaskRow = (task: FlexibleTask, tag?: string, lockIn = false) => {
     const Icon = categoryIcon(task.category);
     const due = lockIn ? dueLabelForTask(task.deadline, today) : null;
-    const urgencyClass = lockIn ? ` task-row-urgency-${due?.urgency}` : "";
+    const pressure = lockIn ? calculateDeadlinePressure(task, calculation.dailyMargins) : null;
+    const deadlineSentence = pressure ? formatDeadlineSentence(task, pressure) : "";
+    const urgencyClass = lockIn ? ` task-row-urgency-${due?.urgency}${pressure && (pressure.unsafeDays.length > 0 || pressure.daysRemaining <= 1) ? " task-row-urgent" : ""}` : "";
+    const expanded = expandedDeadlineIds.includes(task.id);
     if (pendingOutcomeId === task.id) return <div className={`task-row${urgencyClass}`} key={task.id}><div className="outcome-feedback-row"><span>{task.name} — how did it go?</span><div className="outcome-emoji-group">{outcomeEmojis.map((item) => <button key={item.value} className="outcome-emoji-button" aria-label={item.value} onClick={() => { onRecordOutcome(task, item.value); setPendingOutcomeId(null); }}>{item.icon}</button>)}</div></div></div>;
-    return <div className={`task-row${urgencyClass}`} key={task.id}><div className="task-leading">{tag && <span className={`lock-in-tag lock-in-tag-${tag.toLowerCase().replace(/[^a-z]/g, "")}`}>{tag}</span>}<div className={`task-icon task-icon-${task.category}`}><Icon size={15} /></div><div><strong>{task.name}</strong><span>{formatHours(task.estimatedHours)} · {categoryLabel(task.category)} load · due {lockIn ? <em className={`due-label due-label-${due?.urgency}`}>{due?.label}</em> : task.deadline}</span></div></div><button className="icon-button" aria-label={`Delete ${task.name}`} onClick={() => requestDelete(task.id)}><Trash2 size={16} /></button></div>;
+    return <div className={`task-row${urgencyClass}`} key={task.id}><div className="task-leading">{tag && <span className={`lock-in-tag lock-in-tag-${tag.toLowerCase().replace(/[^a-z]/g, "")}`}>{tag}</span>}<div className={`task-icon task-icon-${task.category}`}><Icon size={15} /></div><div><strong>{task.name}</strong><span>{formatHours(task.estimatedHours)} · {categoryLabel(task.category)} load · due {lockIn ? <button className={`deadline-summary deadline-summary-${due?.urgency}`} onClick={() => setExpandedDeadlineIds((current) => current.includes(task.id) ? current.filter((id) => id !== task.id) : [...current, task.id])} aria-expanded={expanded}>{due?.label}</button> : task.deadline}</span>{expanded && <p className="deadline-sentence">{deadlineSentence}</p>}</div></div><button className="icon-button" aria-label={`Delete ${task.name}`} onClick={() => requestDelete(task.id)}><Trash2 size={16} /></button></div>;
   };
   const moodPillTone: Record<MoodValue, string> = { Drained: "pill-negative", Okay: "pill-neutral", Good: "pill-neutral", Energized: "pill-positive" };
   const energyPillTone: Record<EnergyResponse, string> = { Rough: "pill-negative", Okay: "pill-neutral", Ready: "pill-positive" };
