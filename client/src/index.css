@@ -952,3 +952,9 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .task-toast-submit { width: 30px; height: 30px; flex: 0 0 30px; }
 .task-toast-submit:disabled { opacity: .4; cursor: not-allowed; }
 .settings-notification-block { padding-top: 8px; border-top: 1px solid var(--border-crisp); }
+.lockin-note { display: flex; align-items: center; gap: 8px; margin: -4px 0 12px; padding: 9px 10px; color: var(--text-secondary); border: 1px solid var(--border-crisp); border-radius: 8px; background: var(--surface-soft); font-size: 12px; }
+.lockin-note span { flex: 1; }
+.lockin-note .text-button { padding: 0; color: var(--teal); font-size: 12px; }
+.lockin-note .icon-button { width: 24px; height: 24px; }
+.task-row-highlight { animation: highlightPulse 1.6s ease-out 2; }
+@keyframes highlightPulse { 0%, 100% { background: transparent; } 50% { background: rgba(29, 158, 117, 0.15); } }

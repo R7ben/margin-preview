@@ -770,6 +770,8 @@ function App() {
   const [decompHours, setDecompHours] = useState(1);
   const [fixedCommitments, setFixedCommitments] = useState<FixedCommitment[]>(initialFixedCommitments);
   const [tasks, setTasks] = useState<FlexibleTask[]>(initialTasks);
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
   const [recoveryBlocks, setRecoveryBlocks] = useState<RecoveryBlock[]>([]);
   const [overrideCount, setOverrideCount] = useState(0);
   const [triageMarginOverride, setTriageMarginOverride] = useState<number | null>(null);
@@ -815,6 +817,9 @@ function App() {
   const [demoNotificationToken, setDemoNotificationToken] = useState(0);
   const [showMoodToast, setShowMoodToast] = useState(false);
   const [showTaskToast, setShowTaskToast] = useState(false);
+  const [lastToastTaskId, setLastToastTaskId] = useState<number | null>(null);
+  const lastToastTaskIdRef = useRef<number | null>(null);
+  const [showDeprioritizedBanner, setShowDeprioritizedBanner] = useState(false);
   const [taskToastPresets, setTaskToastPresets] = useState(QUICK_ADD_PRESETS.slice(0, 3));
   const taskToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [checkInNotice, setCheckInNotice] = useState<string | null>(null);
@@ -983,9 +988,12 @@ function App() {
       window.setTimeout(() => setShowConsequencePreview(true), 0);
       return;
     }
-    setTasks((current) => [...current, { id: Date.now(), name, estimatedHours: hours, cognitiveLoad: suggestion.cognitiveLoad, deadline, deferred: false, category: suggestion.category }]);
+    const newTask = { id: Date.now(), name, estimatedHours: hours, cognitiveLoad: suggestion.cognitiveLoad, deadline, deferred: false, category: suggestion.category } satisfies FlexibleTask;
+    setTasks((current) => [...current, newTask]);
+    lastToastTaskIdRef.current = newTask.id;
+    setLastToastTaskId(newTask.id);
     dismissTaskPrompt();
-    toast.success(`Added "${name}" — ${formatShortHours(hours)} on ${deadline}`, { action: { label: "View on Dashboard", onClick: () => navTo("dashboard") } });
+    toast.success(`Added "${name}" — ${formatShortHours(hours)} on ${deadline}`, { action: { label: "View on Dashboard", onClick: handleViewOnDashboard } });
   };
 
   const handleToastQuickAdd = (preset: typeof QUICK_ADD_PRESETS[number]) => {
@@ -1262,12 +1270,27 @@ function App() {
 
   const navTo = (next: Screen) => {
     if (next === screen) return;
+    setShowDeprioritizedBanner(false);
     if (next === "guide") { setGuideReturnScreen(screen); setGuideStep(0); }
     setTriageOutcome(null);
     setTriageOutcomeDeficit(null);
     setPlannerMessage("");
     if (next !== "triage") setTriageMarginOverride(null);
     changeScreen(next);
+  };
+
+  const handleViewOnDashboard = () => {
+    setShowDeprioritizedBanner(false);
+    navTo("dashboard");
+    const taskId = lastToastTaskIdRef.current;
+    if (taskId === null) return;
+    const mustDoTask = pickMustDo(tasksRef.current);
+    const maintenanceTask = pickMaintenance(tasksRef.current, mustDoTask?.id);
+    if (mustDoTask?.id !== taskId && maintenanceTask?.id !== taskId) {
+      setShowDeprioritizedBanner(true);
+      window.setTimeout(() => setShowDeprioritizedBanner(false), 6000);
+    }
+    window.setTimeout(() => { lastToastTaskIdRef.current = null; setLastToastTaskId(null); }, 5000);
   };
 
   const openTriage = (margin?: number) => {
@@ -1343,6 +1366,9 @@ function App() {
                   onRecordOutcome={recordTaskOutcome}
                   onDeleteTaskSilently={deleteTaskSilently}
                   onEnergyRespond={respondEnergyCheckIn}
+                  lastToastTaskId={lastToastTaskId}
+                  showDeprioritizedBanner={showDeprioritizedBanner}
+                  onDismissDeprioritizedBanner={() => setShowDeprioritizedBanner(false)}
                 />
               )}
               {screen === "mirror" && (
@@ -1667,7 +1693,7 @@ function BurnoutRiskPanel({ atRiskDays, onRebalance }: { atRiskDays: DayRisk[]; 
 function SurvivalPlanCard({ plan, onMoveTask, onLockBlock, onDismiss }: { plan: WeeklyPlan; onMoveTask: () => void; onLockBlock: () => void; onDismiss: () => void }) {
   return <section className="card survival-plan-card"><div className="section-kicker"><ShieldCheck size={14} /><span>Protect This Week</span></div><div className="survival-plan-row"><div><strong>Hardest day: {plan.hardestDay}</strong><small>{plan.loadDescription}</small></div></div>{plan.taskToMove && <div className="survival-plan-row"><span>Move: “{plan.taskToMove.name}” → Sat</span><button className="secondary-button" onClick={onMoveTask}>Move it</button></div>}{plan.blockToLock && <div className="survival-plan-row"><span>Lock: {plan.blockToLock.day} {plan.blockToLock.type}</span><button className="secondary-button" onClick={onLockBlock}>Lock it</button></div>}<div className="survival-plan-actions"><button className="text-button" onClick={onDismiss}>Got it</button><button className="text-button" onClick={onDismiss}>Remind me Sunday</button></div></section>;
 }
-function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showEnergyCheckIn, showMorningCheckIn, onMorningCheckInRespond, onAddTask, onQuickCheck, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, weeklyPlan, showSurvivalPlan, onMoveWeeklyTask, onLockWeeklyBlock, onDismissSurvivalPlan, onShowWeeklyPlan, onTriage, onRebalance, onRecordOutcome, onDeleteTaskSilently, onEnergyRespond }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; fixedCommitments: FixedCommitment[]; recoveryBlocks: RecoveryBlock[]; showEnergyCheckIn: boolean; showMorningCheckIn: boolean; onMorningCheckInRespond: (value: MoodValue) => void; onAddTask: () => void; onQuickCheck: () => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; weeklyPlan: WeeklyPlan; showSurvivalPlan: boolean; onMoveWeeklyTask: () => void; onLockWeeklyBlock: () => void; onDismissSurvivalPlan: () => void; onShowWeeklyPlan: () => void; onTriage: () => void; onRebalance: (day: string) => void; onRecordOutcome: (task: FlexibleTask, outcome: TaskOutcomeValue) => void; onDeleteTaskSilently: (id: number) => void; onEnergyRespond: (response: EnergyResponse) => void }) {
+function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showEnergyCheckIn, showMorningCheckIn, onMorningCheckInRespond, onAddTask, onQuickCheck, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, weeklyPlan, showSurvivalPlan, onMoveWeeklyTask, onLockWeeklyBlock, onDismissSurvivalPlan, onShowWeeklyPlan, onTriage, onRebalance, onRecordOutcome, onDeleteTaskSilently, onEnergyRespond, lastToastTaskId, showDeprioritizedBanner, onDismissDeprioritizedBanner }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; fixedCommitments: FixedCommitment[]; recoveryBlocks: RecoveryBlock[]; showEnergyCheckIn: boolean; showMorningCheckIn: boolean; onMorningCheckInRespond: (value: MoodValue) => void; onAddTask: () => void; onQuickCheck: () => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; weeklyPlan: WeeklyPlan; showSurvivalPlan: boolean; onMoveWeeklyTask: () => void; onLockWeeklyBlock: () => void; onDismissSurvivalPlan: () => void; onShowWeeklyPlan: () => void; onTriage: () => void; onRebalance: (day: string) => void; onRecordOutcome: (task: FlexibleTask, outcome: TaskOutcomeValue) => void; onDeleteTaskSilently: (id: number) => void; onEnergyRespond: (response: EnergyResponse) => void; lastToastTaskId: number | null; showDeprioritizedBanner: boolean; onDismissDeprioritizedBanner: () => void }) {
   const [showFullWeek, setShowFullWeek] = useState(false);
   const [dailyView, setDailyView] = useState<"week" | "day">("week");
   const [dailyDate, setDailyDate] = useState(() => new Date());
@@ -1739,8 +1765,8 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     const deadlineSentence = pressure ? formatDeadlineSentence(task, pressure) : "";
     const urgencyClass = lockIn ? ` task-row-urgency-${due?.urgency}${pressure && (pressure.unsafeDays.length > 0 || pressure.daysRemaining <= 1) ? " task-row-urgent" : ""}` : "";
     const expanded = expandedDeadlineIds.includes(task.id);
-    if (pendingOutcomeId === task.id) return <div className={`task-row${urgencyClass}`} key={task.id}><div className="outcome-feedback-row"><span>{task.name} — how did it go?</span><div className="outcome-emoji-group">{outcomeEmojis.map((item) => <button key={item.value} className="outcome-emoji-button" aria-label={item.value} onClick={() => { onRecordOutcome(task, item.value); setPendingOutcomeId(null); }}>{item.icon}</button>)}</div></div></div>;
-    return <div className={`task-row${urgencyClass}`} key={task.id}><div className="task-leading">{tag && <span className={`lock-in-tag lock-in-tag-${tag.toLowerCase().replace(/[^a-z]/g, "")}`}>{tag}</span>}<div className={`task-icon task-icon-${task.category}`}><Icon size={15} /></div><div><strong>{task.name}</strong><span>{formatHours(task.estimatedHours)} · {categoryLabel(task.category)} load · due {lockIn ? <button className={`deadline-summary deadline-summary-${due?.urgency}`} onClick={() => setExpandedDeadlineIds((current) => current.includes(task.id) ? current.filter((id) => id !== task.id) : [...current, task.id])} aria-expanded={expanded}>{due?.label}</button> : task.deadline}</span>{expanded && <p className="deadline-sentence">{deadlineSentence}</p>}</div></div><button className="icon-button" aria-label={`Delete ${task.name}`} onClick={() => requestDelete(task.id)}><Trash2 size={16} /></button></div>;
+    if (pendingOutcomeId === task.id) return <div className={`task-row${urgencyClass}${task.id === lastToastTaskId ? " task-row-highlight" : ""}`} key={task.id}><div className="outcome-feedback-row"><span>{task.name} — how did it go?</span><div className="outcome-emoji-group">{outcomeEmojis.map((item) => <button key={item.value} className="outcome-emoji-button" aria-label={item.value} onClick={() => { onRecordOutcome(task, item.value); setPendingOutcomeId(null); }}>{item.icon}</button>)}</div></div></div>;
+    return <div className={`task-row${urgencyClass}${task.id === lastToastTaskId ? " task-row-highlight" : ""}`} key={task.id}><div className="task-leading">{tag && <span className={`lock-in-tag lock-in-tag-${tag.toLowerCase().replace(/[^a-z]/g, "")}`}>{tag}</span>}<div className={`task-icon task-icon-${task.category}`}><Icon size={15} /></div><div><strong>{task.name}</strong><span>{formatHours(task.estimatedHours)} · {categoryLabel(task.category)} load · due {lockIn ? <button className={`deadline-summary deadline-summary-${due?.urgency}`} onClick={() => setExpandedDeadlineIds((current) => current.includes(task.id) ? current.filter((id) => id !== task.id) : [...current, task.id])} aria-expanded={expanded}>{due?.label}</button> : task.deadline}</span>{expanded && <p className="deadline-sentence">{deadlineSentence}</p>}</div></div><button className="icon-button" aria-label={`Delete ${task.name}`} onClick={() => requestDelete(task.id)}><Trash2 size={16} /></button></div>;
   };
   const moodPillTone: Record<MoodValue, string> = { Drained: "pill-negative", Okay: "pill-neutral", Good: "pill-neutral", Energized: "pill-positive" };
   const energyPillTone: Record<EnergyResponse, string> = { Rough: "pill-negative", Okay: "pill-neutral", Ready: "pill-positive" };
@@ -1802,6 +1828,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     {showSurvivalPlan && <SurvivalPlanCard plan={weeklyPlan} onMoveTask={onMoveWeeklyTask} onLockBlock={onLockWeeklyBlock} onDismiss={onDismissSurvivalPlan} />}
     {!showFullWeek ? (
       <section className="card tasks-panel lock-in-panel">
+        {showDeprioritizedBanner && <div className="lockin-note" role="status"><span>Added — didn&apos;t make today&apos;s top 2.</span><button className="text-button" onClick={() => setShowFullWeek(true)}>See full list</button><button className="icon-button" aria-label="Dismiss added task notice" onClick={onDismissDeprioritizedBanner}><X size={14} /></button></div>}
         <div className="tasks-head"><div><span className="card-label">Today's Lock In</span><p className="card-subtitle">Things that matter most</p><div className="lock-in-legend"><span><i className="lock-in-legend-dot lock-in-legend-today" />Today</span><span><i className="lock-in-legend-dot lock-in-legend-tomorrow" />Tomorrow</span><span><i className="lock-in-legend-dot lock-in-legend-week" />This week</span></div></div></div>
         <div className="task-list">
           {lockInTasks.length ? lockInTasks.map(({ task, tag }) => renderTaskRow(task, tag, true)) : <div className="empty-state"><FileText size={19} /><span>No lock-in task right now.</span></div>}
