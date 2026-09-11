@@ -836,3 +836,93 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .text-primary { color: var(--text-primary); }
 .text-secondary { color: var(--text-secondary); }
 .text-tertiary { color: var(--text-tertiary); }
+
+/* Dark-mode contrast pass: keep semantic status colors, but move ordinary copy and surfaces onto theme tokens. */
+:root[data-theme="dark"] .nav-drawer {
+  background: var(--bg-secondary);
+  opacity: 1;
+}
+:root[data-theme="dark"] .nav-drawer-item,
+:root[data-theme="dark"] .nav-drawer-item-active {
+  color: var(--text-primary);
+}
+:root[data-theme="dark"] .nav-drawer-item-active { background: rgba(31,138,130,.22); }
+:root[data-theme="dark"] .sidebar-footer { border-color: var(--border-color); }
+
+:root[data-theme="dark"] .card-label,
+:root[data-theme="dark"] .week-glance-day,
+:root[data-theme="dark"] .metric-label,
+:root[data-theme="dark"] .risk-day,
+:root[data-theme="dark"] .quick-sheet .card-label,
+:root[data-theme="dark"] .settings-card .card-label {
+  color: var(--text-primary);
+}
+:root[data-theme="dark"] .capacity-panel-top .card-label,
+:root[data-theme="dark"] .planner-warning-card > .card-label,
+:root[data-theme="dark"] .planner-blocks-card > .card-label,
+:root[data-theme="dark"] .mirror-easier-card > .card-label {
+  color: var(--text-secondary);
+}
+:root[data-theme="dark"] .risk-day span { color: var(--text-secondary); }
+:root[data-theme="dark"] .risk-card.risk-high { background: rgba(220,38,38,.16); }
+:root[data-theme="dark"] .risk-card.risk-medium { background: rgba(245,158,11,.16); }
+
+:root[data-theme="dark"] .quick-sheet {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+:root[data-theme="dark"] .text-input,
+:root[data-theme="dark"] .task-input,
+:root[data-theme="dark"] .number-input {
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  background: #2A3644;
+}
+:root[data-theme="dark"] .quick-result { background: rgba(31,138,130,.2); }
+:root[data-theme="dark"] .chat-bubble-assistant {
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  background: rgba(31,138,130,.18);
+}
+:root[data-theme="dark"] .chat-bubble-user { background: #0B3D35; color: var(--text-primary); }
+
+:root[data-theme="dark"] .quick-add-tile {
+  color: var(--teal);
+  border-color: var(--border-color);
+  background: var(--bg-tertiary);
+}
+:root[data-theme="dark"] .quick-add-tile:hover { background: rgba(31,138,130,.2); }
+:root[data-theme="dark"] .option-pill-teal { color: var(--text-primary); background: rgba(31,138,130,.22); }
+:root[data-theme="dark"] .option-pill-blue { color: #C7E2F4; background: #203B50; }
+:root[data-theme="dark"] .option-pill-blue2 { color: var(--text-primary); background: #34324B; }
+:root[data-theme="dark"] .btn-secondary { color: var(--text-primary); }
+
+:root[data-theme="dark"] .planner-block-row,
+:root[data-theme="dark"] .metric-card,
+:root[data-theme="dark"] .triage-item {
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  background: var(--bg-secondary);
+}
+:root[data-theme="dark"] .planner-block-locked,
+:root[data-theme="dark"] .triage-item-selected,
+:root[data-theme="dark"] .triage-total {
+  background: rgba(31,138,130,.2);
+}
+:root[data-theme="dark"] .triage-item:hover { background: #26364C; }
+:root[data-theme="dark"] .triage-total span { color: var(--text-secondary); }
+:root[data-theme="dark"] .triage-total strong { color: var(--text-primary); }
+:root[data-theme="dark"] .planner-confirm-sheet,
+:root[data-theme="dark"] .import-edit-modal,
+:root[data-theme="dark"] .consequence-modal {
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  background: var(--bg-secondary);
+}
+
+:root[data-theme="dark"] .stress-pattern-insight {
+  color: var(--text-primary);
+  border-color: var(--teal);
+  background: rgba(31,138,130,.18);
+}
+:root[data-theme="dark"] .weekly-mood-summary { color: var(--text-secondary); }
