@@ -152,6 +152,11 @@ const currentWeekKey = () => {
   monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
   return monday.toDateString();
 };
+const RECOVERY_MENU = {
+  10: [{ name: "Step outside", detail: "Just air and light, no phone" }, { name: "Stretch", detail: "Neck, shoulders, back — desk-side" }, { name: "Breathing reset", detail: "4 counts in, 6 counts out, x5" }],
+  30: [{ name: "Short walk", detail: "Around the block, no destination" }, { name: "Nap", detail: "Set a 25-min alarm, no more" }, { name: "Call someone", detail: "A real conversation, not a text" }],
+  120: [{ name: "Full workout", detail: "Gym, run, or sport" }, { name: "Social time", detail: "See a friend, no agenda" }, { name: "Deep sleep block", detail: "A real nap or early night" }],
+} as const;
 
 const IMPORTED_TIMETABLE: FixedCommitment[] = [
   { id: 901, name: "Design studio", days: ["Mon", "Wed"], startTime: "09:00", endTime: "11:00", hours: 4 },
@@ -558,7 +563,7 @@ const predictBurnoutRisk = ({ calculation, moodCheckIns, energyCheckIns }: { cal
   return { score, label, trend, trendSlope: Number(trendSlope.toFixed(2)) };
 };
 
-function ToastNotification({ screen, lastMoodCheck, onMoodSelect, demoTrigger }: { screen: Screen; lastMoodCheck: number | null; onMoodSelect: (value: MoodValue) => void; demoTrigger: number }) {
+function ToastNotification({ screen, lastMoodCheck, onMoodSelect, onShowRecoveryMenu, demoTrigger }: { screen: Screen; lastMoodCheck: number | null; onMoodSelect: (value: MoodValue) => void; onShowRecoveryMenu: () => void; demoTrigger: number }) {
   const [visible, setVisible] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -626,6 +631,7 @@ function ToastNotification({ screen, lastMoodCheck, onMoodSelect, demoTrigger }:
           </button>
         ))}
       </div>
+      <button className="toast-recovery-action" type="button" onClick={() => { onShowRecoveryMenu(); markDismissed(); }}>Show me recovery options</button>
     </div>
   );
 }
@@ -664,6 +670,7 @@ function App() {
   const [triageMarginOverride, setTriageMarginOverride] = useState<number | null>(null);
   const [triageOutcomeDeficit, setTriageOutcomeDeficit] = useState<number | null>(null);
   const [showQuickCheck, setShowQuickCheck] = useState(false);
+  const [showRecoveryMenu, setShowRecoveryMenu] = useState(false);
   const [showConsequencePreview, setShowConsequencePreview] = useState(false);
   const [importFileName, setImportFileName] = useState("");
   const [importExtracted, setImportExtracted] = useState<VisionCommitment[]>([]);
@@ -1071,7 +1078,7 @@ function App() {
   return (
     <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}${screen === "dashboard" ? " app-shell-dashboard" : ""}`}>
       <div className="app-frame">
-        <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} demoTrigger={demoNotificationToken} />
+        <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} onShowRecoveryMenu={() => setShowRecoveryMenu(true)} demoTrigger={demoNotificationToken} />
         {checkInNotice && <div className="checkin-log-toast" role="status" aria-live="polite">{checkInNotice}</div>}
         <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} onHelp={() => navTo("guide")} onTestNotification={() => setDemoNotificationToken((token) => token + 1)} />
         <div className="screen-container">
@@ -1199,6 +1206,7 @@ function App() {
                   onConfirmUnlock={() => unlockTarget === "all" ? unlockAllBlocks() : unlockTarget !== null ? unlockBlock(unlockTarget) : undefined}
                   onCancelUnlock={() => setUnlockTarget(null)}
                   onSkip={() => navTo("dashboard")}
+                  onShowRecoveryMenu={() => setShowRecoveryMenu(true)}
                 />
               )}
               {screen === "reflection" && (
@@ -1264,6 +1272,7 @@ function App() {
             onAddAnywayOverride={addAnywayOverrideFromPreview}
           />
         )}
+        {showRecoveryMenu && <RecoveryMenu onClose={() => setShowRecoveryMenu(false)} />}
         {screen === "mirror" && (
           <div className="quick-check-fab-wrap">
             <button className="quick-check-fab" aria-label="Can I afford this? Quick check" onClick={openQuickCheck}>
@@ -1837,7 +1846,12 @@ function Triage({ calculation, displayMargin, items, selectedTriage, selectedRec
 
 function FailureState({ onProtect, onDashboard }: { onProtect: () => void; onDashboard: () => void }) { return <div className="failure-panel"><div className="failure-mark"><TriangleAlert size={25} /></div><h1>Some recovery loss this week may be unavoidable.</h1><p>Based on your current commitments, there is no flexible combination that restores the full deficit.</p><div className="what-margin"><strong>What Margin can still do:</strong><span>→ Protect your highest-value sleep nights</span><span>→ Flag which days carry most risk</span><span>→ Plan recovery for next week</span></div><div className="outcome-actions"><button className="secondary-button" onClick={onProtect}>Plan Next Week</button><button className="primary-button" onClick={onDashboard}>Protect What's Left</button></div></div>; }
 
-function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtect, onLockAll, onUnlock, onUnlockAll, unlockTarget, onConfirmUnlock, onCancelUnlock, onSkip }: { loadPattern: { label: string; recommendation: string; category: TaskCategory }; recoveryBlocks: RecoveryBlock[]; plannerMessage: string; onProtect: (id: number) => void; onLockAll: () => void; onUnlock: (id: number) => void; onUnlockAll: () => void; unlockTarget: number | "all" | null; onConfirmUnlock: () => void; onCancelUnlock: () => void; onSkip: () => void }) {
+function RecoveryMenu({ onClose }: { onClose: () => void }) {
+  const [selectedTime, setSelectedTime] = useState<10 | 30 | 120 | null>(null);
+  return <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="recovery-menu-title"><div className="quick-sheet recovery-menu-sheet"><div className="sheet-head"><div><p className="eyebrow">Recovery Menu</p><h2 id="recovery-menu-title">How much time do you have?</h2></div><button className="icon-button" aria-label="Close recovery menu" onClick={onClose}><X size={19} /></button></div><div className="time-selector"><button className={`time-chip ${selectedTime === 10 ? "time-chip-active" : ""}`} onClick={() => setSelectedTime(10)}>10 min</button><button className={`time-chip ${selectedTime === 30 ? "time-chip-active" : ""}`} onClick={() => setSelectedTime(30)}>30 min</button><button className={`time-chip ${selectedTime === 120 ? "time-chip-active" : ""}`} onClick={() => setSelectedTime(120)}>2 hours</button></div>{selectedTime && <div className="recovery-options-list">{RECOVERY_MENU[selectedTime].map((option) => <div key={option.name} className="recovery-option-row"><strong>{option.name}</strong><small>{option.detail}</small></div>)}</div>}<button className="secondary-button" onClick={onClose}>Close</button></div></div>;
+}
+
+function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtect, onLockAll, onUnlock, onUnlockAll, unlockTarget, onConfirmUnlock, onCancelUnlock, onSkip, onShowRecoveryMenu }: { loadPattern: { label: string; recommendation: string; category: TaskCategory }; recoveryBlocks: RecoveryBlock[]; plannerMessage: string; onProtect: (id: number) => void; onLockAll: () => void; onUnlock: (id: number) => void; onUnlockAll: () => void; unlockTarget: number | "all" | null; onConfirmUnlock: () => void; onCancelUnlock: () => void; onSkip: () => void; onShowRecoveryMenu: () => void }) {
   const blocks = recoveryBlocks.length ? recoveryBlocks : [
     { id: 101, day: "Tuesday", startTime: "18:00", endTime: "19:00", type: loadPattern.category === "mental" ? "Physical break" : "Low-stimulus reset", locked: false },
     { id: 102, day: "Thursday", startTime: "18:30", endTime: "19:30", type: loadPattern.category === "social" ? "Solo time" : "Screen-free wind-down", locked: false },
@@ -1864,6 +1878,7 @@ function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtec
     <div className="button-stack">
       <button className="primary-button" disabled={blocks.every((block) => block.locked)} onClick={onLockAll}><LockKeyhole size={17} /> Lock All Suggested Blocks</button>
       <button className="secondary-button planner-unlock-all-button" disabled={!blocks.some((block) => block.locked)} onClick={onUnlockAll}>Unlock All</button>
+      <button className="text-button recovery-menu-trigger" onClick={onShowRecoveryMenu}>What can I do right now?</button>
       <button className="secondary-button" onClick={onSkip}>Skip for Now</button>
     </div>
     {unlockTarget !== null && <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="unlock-confirm-title"><div className="planner-confirm-sheet"><h2 id="unlock-confirm-title">{unlockTarget === "all" ? "Remove all recovery blocks?" : "Remove this recovery block?"}</h2><p>{unlockTarget === "all" ? "All protected recovery time this week will be released." : "This will free up the time but reduce your protected recovery for the week."}</p><div className="planner-confirm-actions"><button className="primary-button primary-button-danger" onClick={onConfirmUnlock}>{unlockTarget === "all" ? "Yes, unlock all" : "Yes, remove it"}</button><button className="secondary-button" onClick={onCancelUnlock}>{unlockTarget === "all" ? "Keep them protected" : "Keep it protected"}</button></div></div></div>}
