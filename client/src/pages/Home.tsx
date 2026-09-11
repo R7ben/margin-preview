@@ -726,7 +726,7 @@ function ToastNotification({ screen, lastMoodCheck, onMoodSelect, onShowRecovery
   );
 }
 
-function TaskQuickAddToast({ presets, onPreviewTask, consequence, draft, onConfirmTask, onChooseLighterDay, onClose }: { presets: typeof QUICK_ADD_PRESETS; onPreviewTask: (name: string, hours: number, deadline?: string) => void; consequence: ToastTaskConsequence | null; draft: ToastTaskDraft | null; onConfirmTask: () => void; onChooseLighterDay: () => void; onClose: () => void }) {
+function TaskQuickAddToast({ presets, onPreviewTask, consequence, draft, onConfirmTask, onChooseLighterDay, onViewDashboard, onClose }: { presets: typeof QUICK_ADD_PRESETS; onPreviewTask: (name: string, hours: number, deadline?: string) => void; consequence: ToastTaskConsequence | null; draft: ToastTaskDraft | null; onConfirmTask: () => void; onChooseLighterDay: () => void; onViewDashboard: () => void; onClose: () => void }) {
   const [notifStep, setNotifStep] = useState<"gate" | "input" | "consequence" | "done">("gate");
   const [noCatchphrase, setNoCatchphrase] = useState("");
   const [otherText, setOtherText] = useState("");
@@ -753,7 +753,7 @@ function TaskQuickAddToast({ presets, onPreviewTask, consequence, draft, onConfi
     setSpeechSupported(Boolean(browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition));
     return () => recognitionRef.current?.abort?.();
   }, []);
-  return <div className="task-toast" role={notifStep === "consequence" ? "dialog" : "status"} aria-live="polite"><div className="task-toast-head"><span>{notifStep === "gate" ? "📝 Got any tasks to add today?" : notifStep === "input" ? "What&apos;s the task?" : notifStep === "done" ? noCatchphrase : `Adding &quot;${draft?.name ?? ""}&quot; (${draft ? formatShortHours(draft.hours) : ""})`}</span>{notifStep !== "done" && <button className="task-toast-close" type="button" aria-label="Close task prompt" onClick={onClose}><X size={16} /></button>}</div>{notifStep === "gate" && <div className="task-toast-actions"><button type="button" className="primary-button" onClick={() => setNotifStep("input")}>Yes</button><button type="button" className="secondary-button" onClick={handleNo}>No</button></div>}{notifStep === "input" && <><div className="task-toast-presets">{presets.map((preset) => <button key={preset.name} type="button" className="task-toast-chip" onClick={() => { onPreviewTask(preset.name, preset.hours); setNotifStep("consequence"); }}>{preset.name}</button>)}</div><div className="task-toast-other-row"><button type="button" className={`mic-button${isListening ? " listening" : ""}`} aria-label="Speak a task" disabled={!speechSupported} onClick={() => runSpeechRecognition({ recognitionRef, onTranscript: (text) => { const parsed = extractDuration(text); setOtherText(parsed.cleanText); if (parsed.hours !== null) setOtherHours(String(parsed.hours)); }, onListeningChange: setIsListening, onUnsupported: () => { setSpeechSupported(false); toast.error("Speech not supported on this device"); } })}>🎤</button><input className="text-input" placeholder="Type here..." value={otherText} onChange={(event) => setOtherText(event.target.value)} /><input className="hours-input" type="number" min="0.5" step="0.5" placeholder="h" aria-label="Estimated hours" value={otherHours} onChange={(event) => setOtherHours(event.target.value)} /></div><button type="button" className="primary-button" disabled={!otherText.trim()} onClick={submitOther}>Continue <ArrowRight size={16} /></button></>}{notifStep === "consequence" && consequence && draft && <><p className="consequence-summary">Recovery margin: {formatHours(consequence.projectedMargin + draft.hours)} → {formatHours(consequence.projectedMargin)}</p>{consequence.isAtRisk ? <p className="task-consequence-warning">⚠️ {consequence.day} would risk {formatShortHours(consequence.riskHours)} of recovery.</p> : <p className="task-consequence-safe">✓ Still comfortable</p>}<div className="task-toast-actions"><button type="button" className="primary-button" onClick={() => { onConfirmTask(); setNotifStep("done"); }}>Yes, add it</button><button type="button" className="secondary-button" onClick={onClose}>No, skip</button></div></>}{notifStep === "done" && noCatchphrase === "" && <p className="task-consequence-safe">Added ✓</p>}</div>;
+  return <div className="task-toast" role={notifStep === "consequence" ? "dialog" : "status"} aria-live="polite"><div className="task-toast-head"><span>{notifStep === "gate" ? "📝 Got any tasks to add today?" : notifStep === "input" ? "What's the task?" : notifStep === "done" ? noCatchphrase : `Adding "${draft?.name ?? ""}" (${draft ? formatShortHours(draft.hours) : ""})`}</span>{notifStep !== "done" && <button className="task-toast-close" type="button" aria-label="Close task prompt" onClick={onClose}><X size={16} /></button>}</div>{notifStep === "gate" && <div className="task-toast-actions"><button type="button" className="primary-button" onClick={() => setNotifStep("input")}>Yes</button><button type="button" className="secondary-button" onClick={handleNo}>No</button></div>}{notifStep === "input" && <><div className="task-toast-presets">{presets.map((preset) => <button key={preset.name} type="button" className="task-toast-chip" onClick={() => { setOtherText(preset.name); setOtherHours(String(preset.hours)); }}>{preset.name}</button>)}</div><div className="task-toast-other-row"><button type="button" className={`mic-button${isListening ? " listening" : ""}`} aria-label="Speak a task" disabled={!speechSupported} onClick={() => runSpeechRecognition({ recognitionRef, onTranscript: (text) => { const parsed = extractDuration(text); setOtherText(parsed.cleanText); if (parsed.hours !== null) setOtherHours(String(parsed.hours)); }, onListeningChange: setIsListening, onUnsupported: () => { setSpeechSupported(false); toast.error("Speech not supported on this device"); } })}>🎤</button><input className="text-input" placeholder="Type here..." value={otherText} onChange={(event) => setOtherText(event.target.value)} /><input className="hours-input" type="number" min="0.5" step="0.5" placeholder="h" aria-label="Estimated hours" value={otherHours} onChange={(event) => setOtherHours(event.target.value)} /></div><button type="button" className="primary-button" disabled={!otherText.trim()} onClick={submitOther}>Continue <ArrowRight size={16} /></button></>}{notifStep === "consequence" && consequence && draft && <><p className="consequence-summary">You'll have {formatHours(consequence.projectedMargin)} left for rest and recovery this week (was {formatHours(consequence.projectedMargin + draft.hours)}).</p>{consequence.isAtRisk ? <p className="task-consequence-warning">⚠️ {consequence.day} would risk {formatShortHours(consequence.riskHours)} of recovery.</p> : <p className="task-consequence-safe">✓ Still comfortable</p>}<div className="task-toast-actions"><button type="button" className="primary-button" onClick={() => { onConfirmTask(); setNotifStep("done"); }}>Yes, add it</button><button type="button" className="secondary-button" onClick={onClose}>No, skip</button></div></>}{notifStep === "done" && noCatchphrase === "" && <><p className="task-consequence-safe">Added ✓</p><div className="task-toast-actions"><button type="button" className="primary-button" onClick={onViewDashboard}>View on Dashboard</button><button type="button" className="secondary-button" onClick={onClose}>Done</button></div></>}</div>;
 }
 
 function RiskNotificationToast({ risk, availableHours, onCheckWeek, onAddTask, onClose }: { risk: WeeklyRiskSummary; availableHours: number; onCheckWeek: () => void; onAddTask: () => void; onClose: () => void }) {
@@ -1024,7 +1024,7 @@ function App() {
     setToastTaskConsequence({ projectedMargin: calculation.margin - hours, projectedDailyMargin, isAtRisk: projectedDailyMargin < 0, day: deadline, riskHours: Math.max(0, Math.round(-projectedDailyMargin * 10) / 10) });
   };
 
-  const addTaskFromToast = (name: string, hours: number, deadline: string, parsedSuggestion = suggestionFor(name), force = false) => {
+  const addTaskFromToast = (name: string, hours: number, deadline: string, parsedSuggestion = suggestionFor(name), force = false, closeAfterAdd = true) => {
     const suggestion = parsedSuggestion;
     if (!force && calculation.margin - hours < 0) {
       setDraftDeadline(deadline);
@@ -1037,13 +1037,14 @@ function App() {
     setTasks((current) => [...current, newTask]);
     lastToastTaskIdRef.current = newTask.id;
     setLastToastTaskId(newTask.id);
-    dismissTaskPrompt();
+    if (closeAfterAdd) dismissTaskPrompt();
     toast.success(`Added "${name}" — ${formatShortHours(hours)} on ${deadline}`, { action: { label: "View on Dashboard", onClick: handleViewOnDashboard } });
   };
 
   const confirmToastTask = () => {
     if (!toastTaskDraft) return;
-    addTaskFromToast(toastTaskDraft.name, toastTaskDraft.hours, toastTaskDraft.deadline, toastTaskDraft.suggestion, true);
+    if (taskToastTimerRef.current) clearTimeout(taskToastTimerRef.current);
+    addTaskFromToast(toastTaskDraft.name, toastTaskDraft.hours, toastTaskDraft.deadline, toastTaskDraft.suggestion, true, false);
     setToastTaskDraft(null);
     setToastTaskConsequence(null);
   };
@@ -1354,7 +1355,7 @@ function App() {
     <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}${screen === "dashboard" ? " app-shell-dashboard" : ""}`}>
       <div className="app-frame">
         <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} onShowRecoveryMenu={() => setShowRecoveryMenu(true)} demoTrigger={demoNotificationToken} blocked={showRiskToast || showTaskToast} onVisibilityChange={setShowMoodToast} />
-        {showTaskToast && !showMoodToast && <TaskQuickAddToast presets={taskToastPresets} onPreviewTask={previewToastTask} consequence={toastTaskConsequence} draft={toastTaskDraft} onConfirmTask={confirmToastTask} onChooseLighterDay={chooseLighterToastDay} onClose={dismissTaskPrompt} />}
+        {showTaskToast && !showMoodToast && <TaskQuickAddToast presets={taskToastPresets} onPreviewTask={previewToastTask} consequence={toastTaskConsequence} draft={toastTaskDraft} onConfirmTask={confirmToastTask} onChooseLighterDay={chooseLighterToastDay} onViewDashboard={() => { dismissTaskPrompt(); handleViewOnDashboard(); }} onClose={dismissTaskPrompt} />}
         {checkInNotice && <div className="checkin-log-toast" role="status" aria-live="polite">{checkInNotice}</div>}
         <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} onHelp={() => navTo("guide")} onTestNotification={() => setDemoNotificationToken((token) => token + 1)} onTestTaskPrompt={showRiskPrompt} />
         {/* Keep this host mounted across navigation; remounting it by screen key can duplicate transition content. */}
@@ -1619,7 +1620,7 @@ function NavDrawer({ open, activeScreen, onNavigate, onClose }: { open: boolean;
             </button>
           ))}
         </nav>
-        <footer className="sidebar-footer"><a href="/terms" className="footer-link">Terms &amp; Conditions</a><span className="footer-divider">•</span><a href="/privacy" className="footer-link">Privacy Policy</a></footer>
+        <footer className="sidebar-footer"><a href="/terms" className="footer-link">Terms and Conditions</a><span className="footer-divider">•</span><a href="/privacy" className="footer-link">Privacy Policy</a></footer>
       </aside>
     </div>
   );
@@ -1834,7 +1835,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     <div className="dashboard-intro"><p className="eyebrow">Your week</p><h1 className="page-heading">Your Week</h1><p className="dashboard-subtitle">With recovery view</p><div className="dashboard-view-toggle"><button className={dailyView === "week" ? "dashboard-view-toggle-active" : ""} onClick={() => setDailyView("week")}>Week</button><button className={dailyView === "day" ? "dashboard-view-toggle-active" : ""} onClick={() => setDailyView("day")}>Day</button></div><div className="dashboard-intro-links"><button className="text-action dashboard-reflection-link" onClick={onReflection}><BarChart3 size={14} /> Weekly Reflection</button><button className="text-action dashboard-reflection-link" onClick={onShowWeeklyPlan}><ShieldCheck size={14} /> Weekly Plan</button></div></div>
     {dailyView === "week" ? <>
     <section className="card hero-margin-card">
-      <div className="hero-card-head"><span className="card-label">Recovery Margin</span><div className="status-pill" style={{ color: status.color, borderColor: `${status.color}44`, background: `${status.color}10` }}><span className="status-dot" style={{ background: status.color }} />{status.label}</div></div>
+      <div className="hero-card-head"><span className="card-label">Rest and recovery time left</span><div className="status-pill" style={{ color: status.color, borderColor: `${status.color}44`, background: `${status.color}10` }}><span className="status-dot" style={{ background: status.color }} />{status.label}</div></div>
       <div className="progress-ring-wrap">
         <svg className="progress-ring-svg" viewBox="0 0 200 200">
           <circle className="progress-ring-track" cx="100" cy="100" r="86" />
