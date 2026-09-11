@@ -2282,8 +2282,8 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
     if (import.meta.env.DEV) console.log("[Quick Check] prompt characters:", systemPreamble.length);
     try {
       if (!apiKey) throw new Error("missing API key");
-      // Flash-Lite uses a separate free-tier quota pool after gemini-3.6-flash was exhausted during testing.
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`, {
+      // Gemini 3.5 Flash-Lite replaces deprecated 2.5 Flash-Lite for new users after the prior model returned 404.
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
