@@ -661,6 +661,7 @@ Computed burnout risk (regression over check-in trend + schedule pressure): ${ri
 
 function App() {
   const [screen, setScreen] = useState<Screen>("onboarding");
+  const renderDiagnosticsRef = useRef({ screen, count: 0, startedAt: Date.now(), warned: false });
   const [sleepHours, setSleepHours] = useState(7);
   const [decompHours, setDecompHours] = useState(1);
   const [fixedCommitments, setFixedCommitments] = useState<FixedCommitment[]>(initialFixedCommitments);
@@ -715,12 +716,29 @@ function App() {
   const [guideStep, setGuideStep] = useState(0);
   const [guideReturnScreen, setGuideReturnScreen] = useState<Screen>("dashboard");
 
+  const renderDiagnostics = renderDiagnosticsRef.current;
+  if (renderDiagnostics.screen !== screen) {
+    renderDiagnostics.screen = screen;
+    renderDiagnostics.count = 0;
+    renderDiagnostics.startedAt = Date.now();
+    renderDiagnostics.warned = false;
+  }
+  renderDiagnostics.count += 1;
+  if (import.meta.env.DEV && !renderDiagnostics.warned && renderDiagnostics.count >= 100 && Date.now() - renderDiagnostics.startedAt < 1000) {
+    renderDiagnostics.warned = true;
+    console.warn(`[render-diagnostics] ${renderDiagnostics.count} renders for ${screen} in under one second`);
+  }
+
   useEffect(() => {
     if (!drawerOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setDrawerOpen(false); };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [drawerOpen]);
+
+  const changeScreen = (next: Screen) => {
+    setScreen((current) => current === next ? current : next);
+  };
 
   const todayKey = new Date().toDateString();
   const showMorningCheckIn = true;
@@ -806,7 +824,7 @@ function App() {
     setDraftEstimateTouched(Boolean(name));
     setConfirmBreach(false);
     setShowActions(false);
-    setScreen("mirror");
+    changeScreen("mirror");
   };
 
   const addTask = (isOverride = false, hoursOverride?: number, deferred = false) => {
@@ -833,7 +851,7 @@ function App() {
     setTriageOutcomeDeficit(null);
     setTriageMarginOverride(null);
     setSelectedTriage([]);
-    setScreen(isOverride && nextOverrideCount >= 3 ? "triage" : "dashboard");
+    changeScreen(isOverride && nextOverrideCount >= 3 ? "triage" : "dashboard");
   };
 
   const addTaskWithDefer = (deferId: number) => {
@@ -928,7 +946,7 @@ function App() {
     setImportLoading(false);
     setImportError("");
     setEditingImportId(null);
-    setScreen("import");
+    changeScreen("import");
   };
 
   const handleVisionFile = async (file: File | undefined) => {
@@ -989,7 +1007,7 @@ function App() {
     setImportExtracted([]);
     setImportError("");
     setImportFileName("");
-    setScreen("onboarding");
+    changeScreen("onboarding");
   };
 
   const saveCommitment = () => {
@@ -1049,7 +1067,7 @@ function App() {
     else if (released > 0) setTriageOutcome("partial");
     else setTriageOutcome("failure");
     setSelectedTriage([]);
-    setScreen("outcomes-summary");
+    changeScreen("outcomes-summary");
   };
 
   const openQuickCheck = () => {
@@ -1059,12 +1077,13 @@ function App() {
   };
 
   const navTo = (next: Screen) => {
+    if (next === screen) return;
     if (next === "guide") { setGuideReturnScreen(screen); setGuideStep(0); }
     setTriageOutcome(null);
     setTriageOutcomeDeficit(null);
     setPlannerMessage("");
     if (next !== "triage") setTriageMarginOverride(null);
-    setScreen(next);
+    changeScreen(next);
   };
 
   const openTriage = (margin?: number) => {
@@ -1081,6 +1100,7 @@ function App() {
         <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} onShowRecoveryMenu={() => setShowRecoveryMenu(true)} demoTrigger={demoNotificationToken} />
         {checkInNotice && <div className="checkin-log-toast" role="status" aria-live="polite">{checkInNotice}</div>}
         <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} onHelp={() => navTo("guide")} onTestNotification={() => setDemoNotificationToken((token) => token + 1)} />
+        {/* Keep this host mounted across navigation; remounting it by screen key can duplicate transition content. */}
         <div className="screen-container">
         {screen === "onboarding" ? (
           <Onboarding
@@ -1168,7 +1188,7 @@ function App() {
                   onFindSlot={() => { setDraftDeadline(DAYS[(lowestDayIndex + 2) % 7]); setShowActions(false); }}
                   onDefer={() => openTriage(projectedMargin)}
                   onChooseOption={(option) => {
-                    if (option === "decline") { setScreen("dashboard"); return; }
+                    if (option === "decline") { changeScreen("dashboard"); return; }
                     if (option === "defer") { addTask(false, undefined, true); return; }
                     if (option === "split") { addTask(false, Math.max(0.5, Math.round(draftHours / 2 * 10) / 10)); return; }
                     addTask(false);
@@ -1235,7 +1255,7 @@ function App() {
                 />
               )}
               {screen === "settings" && <Settings onBack={() => navTo("dashboard")} />}
-              {screen === "guide" && <Guide step={guideStep} setStep={setGuideStep} onClose={() => setScreen(guideReturnScreen)} onDone={() => navTo("dashboard")} />}
+              {screen === "guide" && <Guide step={guideStep} setStep={setGuideStep} onClose={() => changeScreen(guideReturnScreen)} onDone={() => navTo("dashboard")} />}
               {screen === "outcomes-summary" && protectedOutcomes && <OutcomesSummary outcomes={protectedOutcomes} riskRepairMessage={riskRepairMessage} onDashboard={() => navTo("dashboard")} />}
             </main>
           </>
