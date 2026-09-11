@@ -269,6 +269,42 @@ const QUICK_ADD_PRESETS: { name: string; hours: number; displayCategory: string 
   { name: "Meeting", hours: 1, displayCategory: "Social" },
 ];
 
+const extractDuration = (text: string): { hours: number | null; cleanText: string } => {
+  const hourMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h\b)/i);
+  const minMatch = text.match(/(\d+)\s*(?:minutes?|mins?)/i);
+  if (hourMatch) return { hours: parseFloat(hourMatch[1]), cleanText: text.replace(hourMatch[0], "").trim() };
+  if (minMatch) return { hours: Math.round((parseInt(minMatch[1], 10) / 60) * 4) / 4, cleanText: text.replace(minMatch[0], "").trim() };
+  return { hours: null, cleanText: text };
+};
+
+const extractTimeOfDay = (text: string): { time: string | null; cleanText: string } => {
+  const timeMatch = text.match(/\bat\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i);
+  if (!timeMatch) return { time: null, cleanText: text };
+  return { time: timeMatch[1].toLowerCase().replace(/\s+/g, ""), cleanText: text.replace(timeMatch[0], "").trim() };
+};
+
+const extractDay = (text: string): { day: string | null; cleanText: string } => {
+  const todayIndex = (new Date().getDay() + 6) % 7;
+  const dayWords: Record<string, string> = {
+    monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu", friday: "Fri", saturday: "Sat", sunday: "Sun",
+    today: DAYS[todayIndex], tomorrow: DAYS[(todayIndex + 1) % DAYS.length],
+  };
+  for (const [word, day] of Object.entries(dayWords)) {
+    const regex = new RegExp(`\\b${word}\\b`, "i");
+    if (regex.test(text)) return { day, cleanText: text.replace(regex, "").trim() };
+  }
+  return { day: null, cleanText: text };
+};
+
+const parseTaskText = (rawText: string, fallbackDay: string) => {
+  const { hours, cleanText: afterDuration } = extractDuration(rawText);
+  const { time, cleanText: afterTime } = extractTimeOfDay(afterDuration);
+  const { day, cleanText: afterDay } = extractDay(afterTime);
+  const baseName = afterDay.replace(/\s*(?:for|on|,)\s*$/i, "").trim() || "Untitled task";
+  const suggestion = suggestionFor(baseName);
+  return { name: time ? `${baseName} (${time})` : baseName, hours, day: day ?? fallbackDay, explicitDay: day, suggestion };
+};
+
 type SpeechRecognitionOptions = {
   recognitionRef: MutableRefObject<any>;
   onTranscript: (text: string) => void;
@@ -938,34 +974,36 @@ function App() {
     changeScreen("mirror");
   };
 
-  const addTaskFromToast = (name: string, hours: number) => {
-    const suggestion = suggestionFor(name);
+  const addTaskFromToast = (name: string, hours: number, deadline = draftDeadline, parsedSuggestion = suggestionFor(name), includeDay = false) => {
+    const suggestion = parsedSuggestion;
     if (calculation.margin - hours < 0) {
+      setDraftDeadline(deadline);
       startMirror(name, hours);
       dismissTaskPrompt();
       window.setTimeout(() => setShowConsequencePreview(true), 0);
       return;
     }
-    setTasks((current) => [...current, { id: Date.now(), name, estimatedHours: hours, cognitiveLoad: suggestion.cognitiveLoad, deadline: draftDeadline, deferred: false, category: suggestion.category }]);
+    setTasks((current) => [...current, { id: Date.now(), name, estimatedHours: hours, cognitiveLoad: suggestion.cognitiveLoad, deadline, deferred: false, category: suggestion.category }]);
     dismissTaskPrompt();
-    toast.success(`Added: ${name}, ${formatShortHours(hours)}`);
+    toast.success(`Added: ${name}, ${formatShortHours(hours)}${includeDay ? ` · ${deadline}` : ""}`);
   };
 
   const handleToastQuickAdd = (preset: typeof QUICK_ADD_PRESETS[number]) => addTaskFromToast(preset.name, preset.hours);
   const handleToastOtherSubmit = (name: string) => {
-    const suggestion = suggestionFor(name);
-    addTaskFromToast(name, suggestion.midpoint);
+    const parsed = parseTaskText(name, draftDeadline);
+    addTaskFromToast(parsed.name, parsed.hours ?? parsed.suggestion.midpoint, parsed.day, parsed.suggestion, Boolean(parsed.explicitDay));
   };
 
   const addTask = (isOverride = false, hoursOverride?: number, deferred = false) => {
-    const name = draftName.trim() || "Untitled commitment";
-    const suggestion = suggestionFor(name);
+    const parsed = parseTaskText(draftName, draftDeadline);
+    const name = parsed.name;
+    const suggestion = parsed.suggestion;
     const task: FlexibleTask = {
       id: Date.now(),
       name,
-      estimatedHours: Math.max(0.5, Number(hoursOverride ?? draftHours) || suggestion.midpoint),
+      estimatedHours: Math.max(0.5, Number(hoursOverride ?? parsed.hours ?? draftHours) || suggestion.midpoint),
       cognitiveLoad: suggestion.cognitiveLoad,
-      deadline: draftDeadline,
+      deadline: parsed.day,
       deferred,
       category: suggestion.category,
       energy: draftEnergy,
@@ -1051,6 +1089,18 @@ function App() {
   const breachesFloor = projectedMargin < 0 || dailyBreachAmount > 0;
 
   const handleAddAnyway = () => {
+    const parsed = parseTaskText(draftName, draftDeadline);
+    const parsedHours = parsed.hours ?? draftHours;
+    const hasExplicitDetails = parsed.hours !== null || parsed.explicitDay !== null || parsed.name !== (draftName.trim() || "Untitled task");
+    if (hasExplicitDetails) {
+      setDraftName(parsed.name);
+      setDraftHours(parsedHours);
+      setDraftDeadline(parsed.day);
+      setDraftEstimateTouched(true);
+      setConfirmBreach(false);
+      setShowActions(false);
+      return;
+    }
     // confirmBreach means the student already came back through "See impact"; don't re-open the preview.
     if (!showConsequencePreview && !confirmBreach) {
       setShowConsequencePreview(true);
