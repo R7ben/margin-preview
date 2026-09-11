@@ -762,13 +762,10 @@ function RiskNotificationToast({ risk, availableHours, onCheckWeek, onAddTask, o
 
 // Retrieval step of the RAG loop: pulls the student's own locally-stored data (schedule, check-ins,
 // outcomes) into a structured context block so the model answers from real facts, not invented ones.
-const buildUserContext = ({ calculation, tasks, moodCheckIns, energyCheckIns, taskOutcomes, sleepHours, decompHours, risk }: { calculation: CalculationShape; tasks: FlexibleTask[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; taskOutcomes: TaskOutcomeRecord[]; sleepHours: number; decompHours: number; risk: RiskAssessment }) => {
+const buildUserContext = ({ calculation, tasks, sleepHours, decompHours, risk }: { calculation: CalculationShape; tasks: FlexibleTask[]; sleepHours: number; decompHours: number; risk: RiskAssessment }) => {
   const activeTasks = tasks.filter((task) => !task.deferred);
   const taskLines = activeTasks.length ? activeTasks.map((task) => `- ${task.name} (${task.estimatedHours}h, ${task.cognitiveLoad} load, ${categoryLabel(task.category)}, due ${task.deadline})`).join("\n") : "- none scheduled";
   const dayLines = DAYS.map((day, index) => `${day} ${formatShortHours(calculation.dailyMargins[index])}`).join(", ");
-  const recentMoods = moodCheckIns.slice(-7).map((entry) => `${entry.date}: ${entry.value}`).join("; ") || "none logged";
-  const recentEnergy = energyCheckIns.slice(-7).map((entry) => `${entry.date}: ${entry.response}`).join("; ") || "none logged";
-  const outcomeLines = taskOutcomes.slice(-5).map((entry) => `${entry.taskName}: ${entry.outcome}`).join("; ") || "none logged";
 
   return `USER'S CURRENT WEEK (retrieved from their local schedule and check-ins):
 Recovery Margin: ${formatHours(calculation.margin)} (${calculation.status.label})
@@ -777,9 +774,6 @@ Daily margin by day: ${dayLines}
 Longest consecutive high-load run: ${calculation.longestRun} day(s)
 Active tasks this week:
 ${taskLines}
-Recent mood check-ins: ${recentMoods}
-Recent energy check-ins: ${recentEnergy}
-Recent task outcome feedback: ${outcomeLines}
 Computed burnout risk (regression over check-in trend + schedule pressure): ${risk.score}/100, ${risk.label}, trend ${risk.trend}`;
 };
 
@@ -2280,7 +2274,7 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
     setChatInput("");
 
     // Rebuilt fresh on every call from the current props/state closure — never cached or reused across calls.
-    const context = buildUserContext({ calculation, tasks, moodCheckIns, energyCheckIns, taskOutcomes, sleepHours, decompHours, risk });
+    const context = buildUserContext({ calculation, tasks, sleepHours, decompHours, risk });
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 
     setChatLoading(true);
@@ -2299,7 +2293,7 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
           ],
           // No client-side typewriter exists here; deterministic sampling prevents
           // identical questions from producing different partial-looking answers.
-          generationConfig: { maxOutputTokens: 512, temperature: 0 },
+          generationConfig: { thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 256, temperature: 0 },
         }),
       });
       if (!response.ok) throw new Error("bad response");
