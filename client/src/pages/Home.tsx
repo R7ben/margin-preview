@@ -974,7 +974,7 @@ function App() {
     changeScreen("mirror");
   };
 
-  const addTaskFromToast = (name: string, hours: number, deadline = draftDeadline, parsedSuggestion = suggestionFor(name), includeDay = false) => {
+  const addTaskFromToast = (name: string, hours: number, deadline: string, parsedSuggestion = suggestionFor(name)) => {
     const suggestion = parsedSuggestion;
     if (calculation.margin - hours < 0) {
       setDraftDeadline(deadline);
@@ -985,13 +985,17 @@ function App() {
     }
     setTasks((current) => [...current, { id: Date.now(), name, estimatedHours: hours, cognitiveLoad: suggestion.cognitiveLoad, deadline, deferred: false, category: suggestion.category }]);
     dismissTaskPrompt();
-    toast.success(`Added: ${name}, ${formatShortHours(hours)}${includeDay ? ` · ${deadline}` : ""}`);
+    toast.success(`Added "${name}" — ${formatShortHours(hours)} on ${deadline}`, { action: { label: "View on Dashboard", onClick: () => navTo("dashboard") } });
   };
 
-  const handleToastQuickAdd = (preset: typeof QUICK_ADD_PRESETS[number]) => addTaskFromToast(preset.name, preset.hours);
+  const handleToastQuickAdd = (preset: typeof QUICK_ADD_PRESETS[number]) => {
+    const todayDayCode = DAYS[(new Date().getDay() + 6) % 7];
+    addTaskFromToast(preset.name, preset.hours, todayDayCode);
+  };
   const handleToastOtherSubmit = (name: string) => {
-    const parsed = parseTaskText(name, draftDeadline);
-    addTaskFromToast(parsed.name, parsed.hours ?? parsed.suggestion.midpoint, parsed.day, parsed.suggestion, Boolean(parsed.explicitDay));
+    const todayDayCode = DAYS[(new Date().getDay() + 6) % 7];
+    const parsed = parseTaskText(name, todayDayCode);
+    addTaskFromToast(parsed.name, parsed.hours ?? parsed.suggestion.midpoint, parsed.day, parsed.suggestion);
   };
 
   const addTask = (isOverride = false, hoursOverride?: number, deferred = false) => {
