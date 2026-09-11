@@ -2283,24 +2283,33 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
     try {
       if (!apiKey) throw new Error("missing API key");
       // Gemini 3.5 Flash-Lite replaces deprecated 2.5 Flash-Lite for new users after the prior model returned 404.
+      const requestBody = {
+        contents: [
+          { role: "user", parts: [{ text: systemPreamble }] },
+          { role: "model", parts: [{ text: "Understood. I'll answer using only this student's real schedule and check-in data." }] },
+          ...nextMessages.map((message) => ({ role: message.role === "user" ? "user" : "model", parts: [{ text: message.content }] })),
+        ],
+        generationConfig: {
+          // thinkingConfig is intentionally omitted for gemini-3.5-flash-lite while diagnosing its INVALID_ARGUMENT response.
+          // thinkingConfig: { thinkingBudget: 0 },
+          maxOutputTokens: 256,
+          temperature: 0,
+        },
+      };
+      console.log("[Quick Check] request body:", requestBody);
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            { role: "user", parts: [{ text: systemPreamble }] },
-            { role: "model", parts: [{ text: "Understood. I'll answer using only this student's real schedule and check-in data." }] },
-            ...nextMessages.map((message) => ({ role: message.role === "user" ? "user" : "model", parts: [{ text: message.content }] })),
-          ],
-          // No client-side typewriter exists here; deterministic sampling prevents
-          // identical questions from producing different partial-looking answers.
-          generationConfig: { thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 256, temperature: 0 },
-        }),
+        body: JSON.stringify(requestBody),
       });
       if (response.status === 429) throw new Error("rate limited");
-      if (response.status >= 500) throw new Error("server failure");
-      if (!response.ok) throw new Error("bad response");
-      const data = await response.json();
+      const responseBody = await response.text();
+      if (!response.ok) {
+        console.error("[Quick Check] Gemini error response:", responseBody);
+        if (response.status >= 500) throw new Error("server failure");
+        throw new Error("bad response");
+      }
+      const data = JSON.parse(responseBody);
       const finishReason = data?.candidates?.[0]?.finishReason;
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (finishReason !== "STOP" && finishReason !== "MAX_TOKENS") throw new Error("invalid finish reason");
