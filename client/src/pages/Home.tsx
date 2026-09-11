@@ -2296,6 +2296,8 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
           generationConfig: { thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 256, temperature: 0 },
         }),
       });
+      if (response.status === 429) throw new Error("rate limited");
+      if (response.status >= 500) throw new Error("server failure");
       if (!response.ok) throw new Error("bad response");
       const data = await response.json();
       const finishReason = data?.candidates?.[0]?.finishReason;
@@ -2306,7 +2308,15 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
     } catch (error) {
       const message = error instanceof Error && error.message === "missing API key"
         ? "Gemini isn't configured for this preview — add VITE_GEMINI_API_KEY to enable AI replies."
-        : "Gemini request failed — check the deployment configuration or try again.";
+        : error instanceof Error && error.message === "rate limited"
+          ? "AI is getting a lot of requests right now — try again in a minute."
+          : error instanceof Error && error.message === "server failure"
+            ? "Gemini is temporarily unavailable — please try again shortly."
+            : error instanceof TypeError
+              ? "Couldn't reach Gemini — check your connection and try again."
+              : error instanceof Error && error.message === "invalid finish reason"
+                ? "Gemini couldn't complete that answer — please try asking again."
+                : "Gemini request failed — check the deployment configuration or try again.";
       setChatMessages([...nextMessages, { role: "assistant", content: message, isError: true }]);
     } finally {
       setChatLoading(false);
