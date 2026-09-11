@@ -1033,7 +1033,7 @@ function App() {
         <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} demoTrigger={demoNotificationToken} />
         {checkInNotice && <div className="checkin-log-toast" role="status" aria-live="polite">{checkInNotice}</div>}
         <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} onHelp={() => navTo("guide")} onTestNotification={() => setDemoNotificationToken((token) => token + 1)} />
-        <div key={screen} className="screen-enter">
+        <div className="screen-container">
         {screen === "onboarding" ? (
           <Onboarding
             sleepHours={sleepHours}
