@@ -1288,7 +1288,6 @@ function App() {
     const maintenanceTask = pickMaintenance(tasksRef.current, mustDoTask?.id);
     if (mustDoTask?.id !== taskId && maintenanceTask?.id !== taskId) {
       setShowDeprioritizedBanner(true);
-      window.setTimeout(() => setShowDeprioritizedBanner(false), 6000);
     }
     window.setTimeout(() => { lastToastTaskIdRef.current = null; setLastToastTaskId(null); }, 5000);
   };
@@ -1756,6 +1755,10 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     const bUrgency = taskUrgency(b.task.deadline, today);
     return urgencyRank[aUrgency.tier] - urgencyRank[bUrgency.tier] || a.task.estimatedHours - b.task.estimatedHours;
   });
+  useEffect(() => {
+    if (!showDeprioritizedBanner || lastToastTaskId === null) return;
+    if (lockInTasks.some(({ task }) => task.id === lastToastTaskId)) onDismissDeprioritizedBanner();
+  }, [lastToastTaskId, lockInTasks, onDismissDeprioritizedBanner, showDeprioritizedBanner]);
   const nextBlock = nextRecoveryBlock(recoveryBlocks);
   const outcomeEmojis: { value: TaskOutcomeValue; icon: string }[] = [{ value: "Easy", icon: "🔥" }, { value: "Fine", icon: "🙂" }, { value: "Hard", icon: "😵" }, { value: "Disaster", icon: "💀" }];
   const renderTaskRow = (task: FlexibleTask, tag?: string, lockIn = false) => {
