@@ -268,6 +268,8 @@ const QUICK_ADD_PRESETS: { name: string; hours: number; displayCategory: string 
   { name: "Presentation", hours: 3, displayCategory: "Mental" },
   { name: "Meeting", hours: 1, displayCategory: "Social" },
 ];
+type ToastTaskDraft = { name: string; hours: number; deadline: string; suggestion: Suggestion };
+type ToastTaskConsequence = { projectedMargin: number; projectedDailyMargin: number; isAtRisk: boolean; day: string; riskHours: number };
 
 const extractDuration = (text: string): { hours: number | null; cleanText: string } => {
   const hourMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h\b)/i);
@@ -724,16 +726,18 @@ function ToastNotification({ screen, lastMoodCheck, onMoodSelect, onShowRecovery
   );
 }
 
-function TaskQuickAddToast({ presets, onQuickAdd, onSubmitOther, onClose }: { presets: typeof QUICK_ADD_PRESETS; onQuickAdd: (preset: typeof QUICK_ADD_PRESETS[number]) => void; onSubmitOther: (name: string) => void; onClose: () => void }) {
+function TaskQuickAddToast({ presets, onPreviewTask, consequence, draft, onConfirmTask, onChooseLighterDay, onClose }: { presets: typeof QUICK_ADD_PRESETS; onPreviewTask: (name: string, hours: number, deadline?: string) => void; consequence: ToastTaskConsequence | null; draft: ToastTaskDraft | null; onConfirmTask: () => void; onChooseLighterDay: () => void; onClose: () => void }) {
   const [otherText, setOtherText] = useState("");
+  const [otherHours, setOtherHours] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
   const recognitionRef = useRef<any>(null);
   const submitOther = () => {
     const name = otherText.trim();
     if (!name) return;
-    onSubmitOther(name);
-    setOtherText("");
+    const parsed = parseTaskText(name, DAYS[(new Date().getDay() + 6) % 7]);
+    const hours = otherHours ? Number.parseFloat(otherHours) : parsed.hours ?? parsed.suggestion.midpoint;
+    if (Number.isFinite(hours) && hours > 0) onPreviewTask(parsed.name, hours, parsed.day);
   };
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -741,17 +745,8 @@ function TaskQuickAddToast({ presets, onQuickAdd, onSubmitOther, onClose }: { pr
     setSpeechSupported(Boolean(browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition));
     return () => recognitionRef.current?.abort?.();
   }, []);
-  return (
-    <div className="task-toast" role="status" aria-live="polite">
-      <div className="task-toast-head"><span>📝 Any tasks to add?</span><button className="task-toast-close" type="button" aria-label="Close task prompt" onClick={onClose}><X size={16} /></button></div>
-      <div className="task-toast-presets">{presets.map((preset) => <button key={preset.name} type="button" className="task-toast-chip" onClick={() => onQuickAdd(preset)}>{preset.name}</button>)}</div>
-      <div className="task-toast-other-row">
-        <button type="button" className={`mic-button${isListening ? " listening" : ""}`} aria-label="Speak a task" disabled={!speechSupported} onClick={() => runSpeechRecognition({ recognitionRef, onTranscript: setOtherText, onListeningChange: setIsListening, onUnsupported: () => { setSpeechSupported(false); toast.error("Speech not supported on this device"); } })}>🎤</button>
-        <input className="text-input" placeholder="Type here..." value={otherText} onChange={(event) => setOtherText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") submitOther(); }} />
-        <button type="button" className="task-toast-submit" aria-label="Add task" disabled={!otherText.trim()} onClick={submitOther}><Send size={16} /></button>
-      </div>
-    </div>
-  );
+  if (consequence && draft) return <div className="task-toast" role="dialog" aria-live="polite"><div className="task-toast-head"><span>Adding &quot;{draft.name}&quot; ({formatShortHours(draft.hours)})</span><button className="task-toast-close" type="button" aria-label="Close task prompt" onClick={onClose}><X size={16} /></button></div>{consequence.isAtRisk ? <p className="task-consequence-warning">⚠️ {consequence.day} would risk {formatShortHours(consequence.riskHours)} of recovery.</p> : <p className="task-consequence-safe">✓ Still comfortable — {formatHours(consequence.projectedMargin)} margin.</p>}<div className="task-toast-actions"><button type="button" className="primary-button" onClick={onConfirmTask}>{consequence.isAtRisk ? "Add anyway" : "Add it"}</button>{consequence.isAtRisk && <button type="button" className="secondary-button" onClick={onChooseLighterDay}>Choose a lighter day</button>}</div></div>;
+  return <div className="task-toast" role="status" aria-live="polite"><div className="task-toast-head"><span>📝 Any tasks to add?</span><button className="task-toast-close" type="button" aria-label="Close task prompt" onClick={onClose}><X size={16} /></button></div><div className="task-toast-presets">{presets.map((preset) => <button key={preset.name} type="button" className="task-toast-chip" onClick={() => onPreviewTask(preset.name, preset.hours)}>{preset.name}</button>)}</div><div className="task-toast-other-row"><button type="button" className={`mic-button${isListening ? " listening" : ""}`} aria-label="Speak a task" disabled={!speechSupported} onClick={() => runSpeechRecognition({ recognitionRef, onTranscript: (text) => { setOtherText(text); const parsed = extractDuration(text); if (parsed.hours !== null) setOtherHours(String(parsed.hours)); }, onListeningChange: setIsListening, onUnsupported: () => { setSpeechSupported(false); toast.error("Speech not supported on this device"); } })}>🎤</button><input className="text-input" placeholder="Type here..." value={otherText} onChange={(event) => setOtherText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") submitOther(); }} /><input className="hours-input" type="number" min="0.5" step="0.5" placeholder="h" aria-label="Estimated hours" value={otherHours} onChange={(event) => setOtherHours(event.target.value)} /><button type="button" className="task-toast-submit" aria-label="Preview task" disabled={!otherText.trim()} onClick={submitOther}><Send size={16} /></button></div></div>;
 }
 
 function RiskNotificationToast({ risk, availableHours, onCheckWeek, onAddTask, onClose }: { risk: WeeklyRiskSummary; availableHours: number; onCheckWeek: () => void; onAddTask: () => void; onClose: () => void }) {
@@ -836,6 +831,8 @@ function App() {
   const [showMoodToast, setShowMoodToast] = useState(false);
   const [showRiskToast, setShowRiskToast] = useState(false);
   const [showTaskToast, setShowTaskToast] = useState(false);
+  const [toastTaskDraft, setToastTaskDraft] = useState<ToastTaskDraft | null>(null);
+  const [toastTaskConsequence, setToastTaskConsequence] = useState<ToastTaskConsequence | null>(null);
   const [lastToastTaskId, setLastToastTaskId] = useState<number | null>(null);
   const lastToastTaskIdRef = useRef<number | null>(null);
   const [showDeprioritizedBanner, setShowDeprioritizedBanner] = useState(false);
@@ -875,6 +872,8 @@ function App() {
   const showTaskPrompt = () => {
     if (showMoodToast) return;
     setShowRiskToast(false);
+    setToastTaskDraft(null);
+    setToastTaskConsequence(null);
     const shuffled = [...QUICK_ADD_PRESETS].sort(() => Math.random() - 0.5);
     setTaskToastPresets(shuffled.slice(0, 3));
     setShowTaskToast(true);
@@ -892,6 +891,8 @@ function App() {
   const dismissTaskPrompt = () => {
     if (taskToastTimerRef.current) clearTimeout(taskToastTimerRef.current);
     setShowTaskToast(false);
+    setToastTaskDraft(null);
+    setToastTaskConsequence(null);
   };
 
   const dismissRiskPrompt = () => setShowRiskToast(false);
@@ -1008,9 +1009,18 @@ function App() {
     changeScreen("mirror");
   };
 
-  const addTaskFromToast = (name: string, hours: number, deadline: string, parsedSuggestion = suggestionFor(name)) => {
+  const previewToastTask = (name: string, hours: number, explicitDeadline?: string) => {
+    const deadline = explicitDeadline ?? DAYS[(new Date().getDay() + 6) % 7];
+    const suggestion = suggestionFor(name);
+    const dayIndex = DAYS.indexOf(deadline);
+    const projectedDailyMargin = calculation.dailyMargins[dayIndex] - hours;
+    setToastTaskDraft({ name, hours, deadline, suggestion });
+    setToastTaskConsequence({ projectedMargin: calculation.margin - hours, projectedDailyMargin, isAtRisk: projectedDailyMargin < 0, day: deadline, riskHours: Math.max(0, Math.round(-projectedDailyMargin * 10) / 10) });
+  };
+
+  const addTaskFromToast = (name: string, hours: number, deadline: string, parsedSuggestion = suggestionFor(name), force = false) => {
     const suggestion = parsedSuggestion;
-    if (calculation.margin - hours < 0) {
+    if (!force && calculation.margin - hours < 0) {
       setDraftDeadline(deadline);
       startMirror(name, hours);
       dismissTaskPrompt();
@@ -1025,14 +1035,19 @@ function App() {
     toast.success(`Added "${name}" — ${formatShortHours(hours)} on ${deadline}`, { action: { label: "View on Dashboard", onClick: handleViewOnDashboard } });
   };
 
-  const handleToastQuickAdd = (preset: typeof QUICK_ADD_PRESETS[number]) => {
-    const todayDayCode = DAYS[(new Date().getDay() + 6) % 7];
-    addTaskFromToast(preset.name, preset.hours, todayDayCode);
+  const confirmToastTask = () => {
+    if (!toastTaskDraft) return;
+    addTaskFromToast(toastTaskDraft.name, toastTaskDraft.hours, toastTaskDraft.deadline, toastTaskDraft.suggestion, true);
+    setToastTaskDraft(null);
+    setToastTaskConsequence(null);
   };
-  const handleToastOtherSubmit = (name: string) => {
-    const todayDayCode = DAYS[(new Date().getDay() + 6) % 7];
-    const parsed = parseTaskText(name, todayDayCode);
-    addTaskFromToast(parsed.name, parsed.hours ?? parsed.suggestion.midpoint, parsed.day, parsed.suggestion);
+  const chooseLighterToastDay = () => {
+    if (!toastTaskDraft) return;
+    setDraftDeadline(toastTaskDraft.deadline);
+    setToastTaskDraft(null);
+    setToastTaskConsequence(null);
+    dismissTaskPrompt();
+    startMirror(toastTaskDraft.name, toastTaskDraft.hours);
   };
 
   const addTask = (isOverride = false, hoursOverride?: number, deferred = false) => {
@@ -1334,7 +1349,7 @@ function App() {
       <div className="app-frame">
         <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} onShowRecoveryMenu={() => setShowRecoveryMenu(true)} demoTrigger={demoNotificationToken} blocked={showRiskToast || showTaskToast} onVisibilityChange={setShowMoodToast} />
         {showRiskToast && !showMoodToast && !showTaskToast && <RiskNotificationToast risk={notificationRisk} availableHours={calculation.availableCapacity} onCheckWeek={() => { dismissRiskPrompt(); navTo("dashboard"); }} onAddTask={() => { dismissRiskPrompt(); showTaskPrompt(); }} onClose={dismissRiskPrompt} />}
-        {showTaskToast && !showMoodToast && <TaskQuickAddToast presets={taskToastPresets} onQuickAdd={handleToastQuickAdd} onSubmitOther={handleToastOtherSubmit} onClose={dismissTaskPrompt} />}
+        {showTaskToast && !showMoodToast && <TaskQuickAddToast presets={taskToastPresets} onPreviewTask={previewToastTask} consequence={toastTaskConsequence} draft={toastTaskDraft} onConfirmTask={confirmToastTask} onChooseLighterDay={chooseLighterToastDay} onClose={dismissTaskPrompt} />}
         {checkInNotice && <div className="checkin-log-toast" role="status" aria-live="polite">{checkInNotice}</div>}
         <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} onHelp={() => navTo("guide")} onTestNotification={() => setDemoNotificationToken((token) => token + 1)} onTestTaskPrompt={showRiskPrompt} />
         {/* Keep this host mounted across navigation; remounting it by screen key can duplicate transition content. */}
