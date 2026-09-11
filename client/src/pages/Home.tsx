@@ -2284,7 +2284,7 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 
     setChatLoading(true);
-    const systemPreamble = `You are Margin, a recovery-first student planning assistant. Using ONLY the real data below, answer the student's question in 2-3 short sentences. Tell them honestly whether their Recovery Margin is comfortable, tight, or in deficit. If tight or in deficit, name one specific task they could defer. Be direct, warm, and brief — no bullet points, no headers, never invent facts not present below.\n\n${context}`;
+    const systemPreamble = `You are Margin, a recovery-first student planning assistant. Using ONLY the real data below, answer the user's specific question directly in 2-3 concise sentences. Do not begin with a generic weekly status or restate the Recovery Margin unless that information is directly relevant to the question. For an affordability or named-task question, assess that task and its stated duration first, using the schedule data. If the question asks about the broader week, summarize the most relevant pattern and one practical adjustment. Be direct, warm, and brief — no bullet points, no headers, never invent facts not present below.\n\n${context}`;
     if (import.meta.env.DEV) console.log("[Quick Check] prompt characters:", systemPreamble.length);
     try {
       if (!apiKey) throw new Error("missing API key");
@@ -2297,7 +2297,9 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
             { role: "model", parts: [{ text: "Understood. I'll answer using only this student's real schedule and check-in data." }] },
             ...nextMessages.map((message) => ({ role: message.role === "user" ? "user" : "model", parts: [{ text: message.content }] })),
           ],
-          generationConfig: { maxOutputTokens: 512, temperature: 0.6 },
+          // No client-side typewriter exists here; deterministic sampling prevents
+          // identical questions from producing different partial-looking answers.
+          generationConfig: { maxOutputTokens: 512, temperature: 0 },
         }),
       });
       if (!response.ok) throw new Error("bad response");
