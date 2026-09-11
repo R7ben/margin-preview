@@ -4,7 +4,7 @@
  * deep ocean frames the interface, blue marks protected recovery infrastructure, and the four state colors
  * communicate actual Recovery Margin changes. Keep whitespace generous, language observational, and agency intact.
  */
-import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type ReactNode, type SetStateAction } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -268,6 +268,40 @@ const QUICK_ADD_PRESETS: { name: string; hours: number; displayCategory: string 
   { name: "Presentation", hours: 3, displayCategory: "Mental" },
   { name: "Meeting", hours: 1, displayCategory: "Social" },
 ];
+
+type SpeechRecognitionOptions = {
+  recognitionRef: MutableRefObject<any>;
+  onTranscript: (text: string) => void;
+  onListeningChange: (listening: boolean) => void;
+  onUnsupported: () => void;
+};
+
+const runSpeechRecognition = ({ recognitionRef, onTranscript, onListeningChange, onUnsupported }: SpeechRecognitionOptions) => {
+  if (typeof window === "undefined") return;
+  const browserWindow = window as Window & { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any };
+  const SpeechRecognition = browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition;
+  if (!SpeechRecognition) { onUnsupported(); return; }
+  recognitionRef.current?.abort?.();
+  const recognition = new SpeechRecognition();
+  recognition.lang = "en-US";
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.onstart = () => onListeningChange(true);
+  recognition.onresult = (event: any) => {
+    let transcript = "";
+    for (let index = event.resultIndex; index < event.results.length; index += 1) transcript += `${event.results[index][0].transcript} `;
+    onTranscript(transcript.trim());
+  };
+  recognition.onerror = (event: { error?: string }) => {
+    if (event.error === "not-allowed" || event.error === "service-not-allowed") toast.error("Please enable microphone in your browser settings");
+    else if (event.error === "no-speech") toast.error("Couldn't hear you — try again");
+    else toast.error("Couldn't hear you — try again");
+    onListeningChange(false);
+  };
+  recognition.onend = () => { onListeningChange(false); recognitionRef.current = null; };
+  recognitionRef.current = recognition;
+  try { recognition.start(); } catch { onListeningChange(false); toast.error("Couldn't start speech recognition — try again"); }
+};
 
 const parseTime = (time: string) => {
   const [hours, minutes] = time.split(":").map(Number);
@@ -563,7 +597,7 @@ const predictBurnoutRisk = ({ calculation, moodCheckIns, energyCheckIns }: { cal
   return { score, label, trend, trendSlope: Number(trendSlope.toFixed(2)) };
 };
 
-function ToastNotification({ screen, lastMoodCheck, onMoodSelect, onShowRecoveryMenu, demoTrigger }: { screen: Screen; lastMoodCheck: number | null; onMoodSelect: (value: MoodValue) => void; onShowRecoveryMenu: () => void; demoTrigger: number }) {
+function ToastNotification({ screen, lastMoodCheck, onMoodSelect, onShowRecoveryMenu, demoTrigger, blocked, onVisibilityChange }: { screen: Screen; lastMoodCheck: number | null; onMoodSelect: (value: MoodValue) => void; onShowRecoveryMenu: () => void; demoTrigger: number; blocked: boolean; onVisibilityChange: (visible: boolean) => void }) {
   const [visible, setVisible] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -582,20 +616,23 @@ function ToastNotification({ screen, lastMoodCheck, onMoodSelect, onShowRecovery
     hideTimerRef.current = setTimeout(() => {
       setVisible(false);
       setDismissing(false);
+      onVisibilityChange(false);
     }, 200);
   };
 
   useEffect(() => {
     if (!demoTrigger) return;
+    if (blocked) return;
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     setDismissing(false);
     setVisible(true);
+    onVisibilityChange(true);
     dismissTimerRef.current = setTimeout(markDismissed, 8000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [demoTrigger]);
+  }, [blocked, demoTrigger, onVisibilityChange]);
 
   useEffect(() => {
-    if (visible || dismissing) return;
+    if (blocked || visible || dismissing) return;
     if (typeof window !== "undefined" && JSON.parse(window.localStorage.getItem("notifications-enabled") ?? "true") === false) return;
     const lastCheck = readLastMoodCheck();
     const interval = typeof window !== "undefined" ? window.localStorage.getItem("notification-interval") ?? "4" : "4";
@@ -607,20 +644,21 @@ function ToastNotification({ screen, lastMoodCheck, onMoodSelect, onShowRecovery
     const eligible = interval === "once" || interval === "twice" ? scheduledEligible : !lastCheck || Date.now() - lastCheck >= Number(interval) * 60 * 60 * 1000;
     if (!eligible) return;
     setVisible(true);
+    onVisibilityChange(true);
     dismissTimerRef.current = setTimeout(markDismissed, 8000);
     return () => {
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     };
     // Navigation re-evaluates eligibility without allowing stacked notifications.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen, lastMoodCheck, visible, dismissing]);
+  }, [blocked, screen, lastMoodCheck, visible, dismissing, onVisibilityChange]);
 
   useEffect(() => () => {
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
   }, []);
 
-  if (!visible) return null;
+  if (!visible || blocked) return null;
   return (
     <div className={`toast-notification${dismissing ? " toast-notification-dismissing" : ""}`} role="status" aria-live="polite">
       <div className="toast-notification-title">🎯 How are you feeling right now?</div>
@@ -632,6 +670,36 @@ function ToastNotification({ screen, lastMoodCheck, onMoodSelect, onShowRecovery
         ))}
       </div>
       <button className="toast-recovery-action" type="button" onClick={() => { onShowRecoveryMenu(); markDismissed(); }}>Show me recovery options</button>
+    </div>
+  );
+}
+
+function TaskQuickAddToast({ presets, onQuickAdd, onSubmitOther, onClose }: { presets: typeof QUICK_ADD_PRESETS; onQuickAdd: (preset: typeof QUICK_ADD_PRESETS[number]) => void; onSubmitOther: (name: string) => void; onClose: () => void }) {
+  const [otherText, setOtherText] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(true);
+  const recognitionRef = useRef<any>(null);
+  const submitOther = () => {
+    const name = otherText.trim();
+    if (!name) return;
+    onSubmitOther(name);
+    setOtherText("");
+  };
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const browserWindow = window as Window & { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any };
+    setSpeechSupported(Boolean(browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition));
+    return () => recognitionRef.current?.abort?.();
+  }, []);
+  return (
+    <div className="task-toast" role="status" aria-live="polite">
+      <div className="task-toast-head"><span>📝 Any tasks to add?</span><button className="task-toast-close" type="button" aria-label="Close task prompt" onClick={onClose}><X size={16} /></button></div>
+      <div className="task-toast-presets">{presets.map((preset) => <button key={preset.name} type="button" className="task-toast-chip" onClick={() => onQuickAdd(preset)}>{preset.name}</button>)}</div>
+      <div className="task-toast-other-row">
+        <button type="button" className={`mic-button${isListening ? " listening" : ""}`} aria-label="Speak a task" disabled={!speechSupported} onClick={() => runSpeechRecognition({ recognitionRef, onTranscript: setOtherText, onListeningChange: setIsListening, onUnsupported: () => { setSpeechSupported(false); toast.error("Speech not supported on this device"); } })}>🎤</button>
+        <input className="text-input" placeholder="Type here..." value={otherText} onChange={(event) => setOtherText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") submitOther(); }} />
+        <button type="button" className="task-toast-submit" aria-label="Add task" disabled={!otherText.trim()} onClick={submitOther}><Send size={16} /></button>
+      </div>
     </div>
   );
 }
@@ -709,6 +777,10 @@ function App() {
     return Number.isFinite(stored) && stored > 0 ? stored : null;
   });
   const [demoNotificationToken, setDemoNotificationToken] = useState(0);
+  const [showMoodToast, setShowMoodToast] = useState(false);
+  const [showTaskToast, setShowTaskToast] = useState(false);
+  const [taskToastPresets, setTaskToastPresets] = useState(QUICK_ADD_PRESETS.slice(0, 3));
+  const taskToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [checkInNotice, setCheckInNotice] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [survivalPlanDismissedWeek, setSurvivalPlanDismissedWeek] = useState<string | null>(() => typeof window === "undefined" ? null : window.localStorage.getItem("survivalPlanDismissedWeek"));
@@ -739,6 +811,45 @@ function App() {
   const changeScreen = (next: Screen) => {
     setScreen((current) => current === next ? current : next);
   };
+
+  const showTaskPrompt = () => {
+    if (showMoodToast) return;
+    const shuffled = [...QUICK_ADD_PRESETS].sort(() => Math.random() - 0.5);
+    setTaskToastPresets(shuffled.slice(0, 3));
+    setShowTaskToast(true);
+    if (taskToastTimerRef.current) clearTimeout(taskToastTimerRef.current);
+    if (typeof window !== "undefined") window.localStorage.setItem("last-task-toast-time", String(Date.now()));
+    taskToastTimerRef.current = setTimeout(() => setShowTaskToast(false), 10000);
+  };
+
+  const dismissTaskPrompt = () => {
+    if (taskToastTimerRef.current) clearTimeout(taskToastTimerRef.current);
+    setShowTaskToast(false);
+  };
+
+  useEffect(() => () => {
+    if (taskToastTimerRef.current) clearTimeout(taskToastTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (showTaskToast) return;
+    if (typeof window !== "undefined" && JSON.parse(window.localStorage.getItem("task-toast-enabled") ?? "true") === false) return;
+    const interval = typeof window !== "undefined" ? window.localStorage.getItem("task-toast-interval") ?? "4" : "4";
+    if (interval === "manual") return;
+    const lastShown = typeof window !== "undefined" ? Number(window.localStorage.getItem("last-task-toast-time") ?? "0") : 0;
+    const moodEnabled = typeof window === "undefined" || JSON.parse(window.localStorage.getItem("notifications-enabled") ?? "true") !== false;
+    const lastMoodShown = typeof window !== "undefined" ? Number(window.localStorage.getItem(LAST_MOOD_CHECK_KEY) ?? "0") : 0;
+    if (!lastShown && moodEnabled && !lastMoodShown) return;
+    const now = new Date();
+    const lastDate = lastShown ? new Date(lastShown) : null;
+    const todayAt = (hour: number) => { const date = new Date(now); date.setHours(hour, 0, 0, 0); return date.getTime(); };
+    const scheduledEligible = interval === "once" ? now.getTime() >= todayAt(9) && (!lastDate || lastDate.getTime() < todayAt(9)) : interval === "twice" ? (now.getTime() >= todayAt(17) && (!lastDate || lastDate.getTime() < todayAt(17))) || (now.getTime() >= todayAt(9) && (!lastDate || lastDate.getTime() < todayAt(9))) : false;
+    const eligible = interval === "once" || interval === "twice" ? scheduledEligible : !lastShown || Date.now() - lastShown >= Number(interval) * 60 * 60 * 1000;
+    if (!eligible) return;
+    showTaskPrompt();
+    // Navigation re-evaluates eligibility without stacking with the mood toast.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, showMoodToast, showTaskToast]);
 
   const todayKey = new Date().toDateString();
   const showMorningCheckIn = true;
@@ -825,6 +936,25 @@ function App() {
     setConfirmBreach(false);
     setShowActions(false);
     changeScreen("mirror");
+  };
+
+  const addTaskFromToast = (name: string, hours: number) => {
+    const suggestion = suggestionFor(name);
+    if (calculation.margin - hours < 0) {
+      startMirror(name, hours);
+      dismissTaskPrompt();
+      window.setTimeout(() => setShowConsequencePreview(true), 0);
+      return;
+    }
+    setTasks((current) => [...current, { id: Date.now(), name, estimatedHours: hours, cognitiveLoad: suggestion.cognitiveLoad, deadline: draftDeadline, deferred: false, category: suggestion.category }]);
+    dismissTaskPrompt();
+    toast.success(`Added: ${name}, ${formatShortHours(hours)}`);
+  };
+
+  const handleToastQuickAdd = (preset: typeof QUICK_ADD_PRESETS[number]) => addTaskFromToast(preset.name, preset.hours);
+  const handleToastOtherSubmit = (name: string) => {
+    const suggestion = suggestionFor(name);
+    addTaskFromToast(name, suggestion.midpoint);
   };
 
   const addTask = (isOverride = false, hoursOverride?: number, deferred = false) => {
@@ -1097,9 +1227,10 @@ function App() {
   return (
     <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}${screen === "dashboard" ? " app-shell-dashboard" : ""}`}>
       <div className="app-frame">
-        <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} onShowRecoveryMenu={() => setShowRecoveryMenu(true)} demoTrigger={demoNotificationToken} />
+        <ToastNotification screen={screen} lastMoodCheck={lastMoodCheck} onMoodSelect={respondMorningCheckIn} onShowRecoveryMenu={() => setShowRecoveryMenu(true)} demoTrigger={demoNotificationToken} blocked={showTaskToast} onVisibilityChange={setShowMoodToast} />
+        {showTaskToast && !showMoodToast && <TaskQuickAddToast presets={taskToastPresets} onQuickAdd={handleToastQuickAdd} onSubmitOther={handleToastOtherSubmit} onClose={dismissTaskPrompt} />}
         {checkInNotice && <div className="checkin-log-toast" role="status" aria-live="polite">{checkInNotice}</div>}
-        <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} onHelp={() => navTo("guide")} onTestNotification={() => setDemoNotificationToken((token) => token + 1)} />
+        <Header screen={screen} isDark={isDarkScreen} onBack={() => navTo("dashboard")} onMenu={() => setDrawerOpen(true)} onHelp={() => navTo("guide")} onTestNotification={() => setDemoNotificationToken((token) => token + 1)} onTestTaskPrompt={showTaskPrompt} />
         {/* Keep this host mounted across navigation; remounting it by screen key can duplicate transition content. */}
         <div className="screen-container">
         {screen === "onboarding" ? (
@@ -1365,7 +1496,7 @@ function NavDrawer({ open, activeScreen, onNavigate, onClose }: { open: boolean;
   );
 }
 
-function Header({ screen, isDark, onBack, onMenu, onHelp, onTestNotification }: { screen: Screen; isDark: boolean; onBack: () => void; onMenu: () => void; onHelp: () => void; onTestNotification: () => void }) {
+function Header({ screen, isDark, onBack, onMenu, onHelp, onTestNotification, onTestTaskPrompt }: { screen: Screen; isDark: boolean; onBack: () => void; onMenu: () => void; onHelp: () => void; onTestNotification: () => void; onTestTaskPrompt: () => void }) {
   const { theme, toggleTheme } = useTheme();
   return (
     <header className={`topbar ${isDark ? "topbar-dark" : "topbar-light"}`}>
@@ -1377,6 +1508,7 @@ function Header({ screen, isDark, onBack, onMenu, onHelp, onTestNotification }: 
         </div>
         {screen !== "guide" && <button className="help-button" aria-label="How it works" title="How it works" onClick={onHelp}>?</button>}
         <button className="test-notification-btn" aria-label="Test mood notification" title="Test notification (demo only)" onClick={onTestNotification}><Bell size={16} /></button>
+        <button className="test-task-notification-btn" aria-label="Test task prompt" title="Test task prompt (demo only)" onClick={onTestTaskPrompt}><ClipboardList size={16} /></button>
         <button className="theme-toggle" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={toggleTheme}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
         <span className="topbar-spacer" aria-hidden="true" />
       </div>
@@ -1683,30 +1815,7 @@ function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargi
   }, []);
 
   const startSpeechRecognition = () => {
-    if (typeof window === "undefined") return;
-    const browserWindow = window as Window & { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any };
-    const SpeechRecognition = browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition;
-    if (!SpeechRecognition) { setSpeechSupported(false); toast.error("Speech not supported on this device"); return; }
-    recognitionRef.current?.abort?.();
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.onstart = () => setIsListening(true);
-    recognition.onresult = (event: any) => {
-      let transcript = "";
-      for (let index = event.resultIndex; index < event.results.length; index += 1) transcript += `${event.results[index][0].transcript} `;
-      setDraftName(transcript.trim());
-    };
-    recognition.onerror = (event: { error?: string }) => {
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") toast.error("Please enable microphone in your browser settings");
-      else if (event.error === "no-speech") toast.error("Couldn't hear you — try again");
-      else toast.error("Couldn't hear you — try again");
-      setIsListening(false);
-    };
-    recognition.onend = () => { setIsListening(false); recognitionRef.current = null; };
-    recognitionRef.current = recognition;
-    try { recognition.start(); } catch { setIsListening(false); toast.error("Couldn't start speech recognition — try again"); }
+    runSpeechRecognition({ recognitionRef, onTranscript: setDraftName, onListeningChange: setIsListening, onUnsupported: () => { setSpeechSupported(false); toast.error("Speech not supported on this device"); } });
   };
 
   const stageTwo = projectedMargin < 0;
@@ -1928,13 +2037,17 @@ function Settings({ onBack }: { onBack: () => void }) {
   const { theme, toggleTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => typeof window === "undefined" ? true : JSON.parse(window.localStorage.getItem("notifications-enabled") ?? "true"));
   const [reminderInterval, setReminderInterval] = useState(() => typeof window === "undefined" ? "4" : window.localStorage.getItem("notification-interval") ?? "4");
+  const [taskPromptsEnabled, setTaskPromptsEnabled] = useState(() => typeof window === "undefined" ? true : JSON.parse(window.localStorage.getItem("task-toast-enabled") ?? "true"));
+  const [taskPromptInterval, setTaskPromptInterval] = useState(() => typeof window === "undefined" ? "4" : window.localStorage.getItem("task-toast-interval") ?? "4");
   const handleSave = () => {
     window.localStorage.setItem("notifications-enabled", JSON.stringify(notificationsEnabled));
     window.localStorage.setItem("notification-interval", reminderInterval);
+    window.localStorage.setItem("task-toast-enabled", JSON.stringify(taskPromptsEnabled));
+    window.localStorage.setItem("task-toast-interval", taskPromptInterval);
     toast.success("Settings saved");
   };
   const intervalOptions = [{ value: "2", label: "Every 2 hours" }, { value: "4", label: "Every 4 hours" }, { value: "6", label: "Every 6 hours" }, { value: "twice", label: "Twice a day (9am, 5pm)" }, { value: "once", label: "Once a day (9am)" }, { value: "manual", label: "Manual only (I'll check in)" }];
-  return <div className="settings-screen"><div className="settings-heading"><button className="text-button settings-back-button" onClick={onBack}><ArrowLeft size={14} /> Settings</button><h1>Settings</h1></div><section className="card settings-card"><span className="card-label">Appearance</span><div className="settings-group"><span className="settings-option-label">Theme</span><div className="theme-options"><button className={`theme-option ${theme === "light" ? "active" : ""}`} onClick={() => theme !== "light" && toggleTheme()}>☀️ Light</button><button className={`theme-option ${theme === "dark" ? "active" : ""}`} onClick={() => theme !== "dark" && toggleTheme()}>🌙 Dark</button></div><p className="settings-hint">Dark mode reduces eye strain before bed.</p></div><span className="card-label">Notifications</span><label className="settings-toggle-row"><span><strong>Mood Check Reminders</strong><small>Prompt you to log how you feel.</small></span><input type="checkbox" checked={notificationsEnabled} onChange={(event) => setNotificationsEnabled(event.target.checked)} /></label><div className="settings-option-group"><span className="settings-option-label">How often?</span><div className="interval-options">{intervalOptions.map((option) => <label key={option.value}><input type="radio" name="notification-interval" value={option.value} checked={reminderInterval === option.value} onChange={(event) => setReminderInterval(event.target.value)} />{option.label}</label>)}</div></div><button className="primary-button" onClick={handleSave}>Save preferences</button></section></div>;
+  return <div className="settings-screen"><div className="settings-heading"><button className="text-button settings-back-button" onClick={onBack}><ArrowLeft size={14} /> Settings</button><h1>Settings</h1></div><section className="card settings-card"><span className="card-label">Appearance</span><div className="settings-group"><span className="settings-option-label">Theme</span><div className="theme-options"><button className={`theme-option ${theme === "light" ? "active" : ""}`} onClick={() => theme !== "light" && toggleTheme()}>☀️ Light</button><button className={`theme-option ${theme === "dark" ? "active" : ""}`} onClick={() => theme !== "dark" && toggleTheme()}>🌙 Dark</button></div><p className="settings-hint">Dark mode reduces eye strain before bed.</p></div><span className="card-label">Notifications</span><label className="settings-toggle-row"><span><strong>Mood Check Reminders</strong><small>Prompt you to log how you feel.</small></span><input type="checkbox" checked={notificationsEnabled} onChange={(event) => setNotificationsEnabled(event.target.checked)} /></label><div className="settings-option-group"><span className="settings-option-label">How often?</span><div className="interval-options">{intervalOptions.map((option) => <label key={`mood-${option.value}`}><input type="radio" name="notification-interval" value={option.value} checked={reminderInterval === option.value} onChange={(event) => setReminderInterval(event.target.value)} />{option.label}</label>)}</div></div><div className="settings-notification-block"><label className="settings-toggle-row"><span><strong>Task Prompts</strong><small>Prompt you to add tasks without opening Add Task.</small></span><input type="checkbox" checked={taskPromptsEnabled} onChange={(event) => setTaskPromptsEnabled(event.target.checked)} /></label><div className="settings-option-group"><span className="settings-option-label">How often?</span><div className="interval-options">{intervalOptions.map((option) => <label key={`task-${option.value}`}><input type="radio" name="task-toast-interval" value={option.value} checked={taskPromptInterval === option.value} onChange={(event) => setTaskPromptInterval(event.target.value)} />{option.label}</label>)}</div></div></div><button className="primary-button" onClick={handleSave}>Save preferences</button></section></div>;
 }
 
 function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, energyCheckIns, recoveryBlocks, onNextWeek, onAdjust }: { calculation: CalculationShape; overrideCount: number; taskOutcomes: TaskOutcomeRecord[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; recoveryBlocks: RecoveryBlock[]; onNextWeek: () => void; onAdjust: () => void }) {
