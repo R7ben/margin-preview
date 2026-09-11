@@ -926,3 +926,12 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
   background: rgba(31,138,130,.18);
 }
 :root[data-theme="dark"] .weekly-mood-summary { color: var(--text-secondary); }
+
+/* Compatibility overrides for the ThemeProvider's document-level .dark class. */
+.dark .category-breakdown-hours { color: #E8F3EF; }
+.dark .hours-chip {
+  color: #E8F3EF !important;
+  background: rgba(232,243,239,.12) !important;
+}
+.dark .commitment-row strong { color: #E8F3EF; }
+.dark .commitment-row span { color: #B9C4BE; }
