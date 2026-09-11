@@ -1011,6 +1011,7 @@ function App() {
   };
 
   const navTo = (next: Screen) => {
+    console.log("[navTo] called, changing screen to:", next, "current screen was:", screen);
     if (next === "guide") { setGuideReturnScreen(screen); setGuideStep(0); }
     setTriageOutcome(null);
     setTriageOutcomeDeficit(null);
@@ -1027,6 +1028,7 @@ function App() {
 
   const isDarkScreen = screen === "mirror" || screen === "planner" || screen === "reflection" || screen === "import";
 
+  console.log("[render] rendering screen:", screen, "timestamp:", Date.now());
   return (
     <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}${screen === "dashboard" ? " app-shell-dashboard" : ""}`}>
       <div className="app-frame">
