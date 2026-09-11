@@ -402,9 +402,11 @@ const getWeeklyRiskSummary = (tasks: FlexibleTask[], fixedCommitments: FixedComm
   const riskDays = analyzeWeekRisk(tasks, fixedCommitments, recoveryBlocks).filter((day) => day.riskLevel !== "low");
   const hardestDay = riskDays.sort((a, b) => b.totalHours - a.totalHours)[0] ?? analyzeWeekRisk(tasks, fixedCommitments, recoveryBlocks).sort((a, b) => a.totalHours - b.totalHours).at(-1);
   const isAtRisk = calculation.margin <= 5 || riskDays.length > 0;
+  const dailyRecoveryFloorHours = Math.max(0, (calculation.tier2Total - calculation.recoveryBlockTotal) / 7);
+  const hoursAtRisk = Math.max(0, Math.round((dailyRecoveryFloorHours + (hardestDay?.totalHours ?? 0) - 24) * 10) / 10);
   return {
     isAtRisk,
-    hoursAtRisk: Math.max(0, Math.round((5 - calculation.margin) * 10) / 10),
+    hoursAtRisk,
     hardestDay: hardestDay ? fullDayName(hardestDay.day) : "Your week",
     reason: hardestDay?.riskNarrative.replace(`${fullDayName(hardestDay.day)} has `, "").replace(/\. Consider protecting recovery\.$/, "") ?? "your recovery margin is getting narrow",
   };
@@ -753,7 +755,7 @@ function TaskQuickAddToast({ presets, onQuickAdd, onSubmitOther, onClose }: { pr
 }
 
 function RiskNotificationToast({ risk, availableHours, onCheckWeek, onAddTask, onClose }: { risk: WeeklyRiskSummary; availableHours: number; onCheckWeek: () => void; onAddTask: () => void; onClose: () => void }) {
-  return <div className="risk-toast" role="status" aria-live="polite"><div className="risk-toast-head"><strong>{risk.isAtRisk ? `⚠️ You&apos;re risking ${formatShortHours(risk.hoursAtRisk)} of recovery this week` : `✓ Recovery margin steady — ${formatShortHours(availableHours)} available this week`}</strong><button className="icon-button" aria-label="Close recovery check-in" onClick={onClose}><X size={16} /></button></div>{risk.isAtRisk && <p className="risk-toast-detail">{risk.hardestDay} is tightest — {risk.reason}.</p>}<div className="risk-toast-actions"><button className="secondary-button" onClick={onCheckWeek}>Check my week</button><button className="text-button" onClick={onAddTask}>Add a task</button></div></div>;
+  return <div className="risk-toast" role="status" aria-live="polite"><div className="risk-toast-head"><strong>{risk.isAtRisk ? `⚠️ You're risking ${formatShortHours(risk.hoursAtRisk)} of recovery this week` : `✓ Recovery margin steady — ${formatShortHours(availableHours)} available this week`}</strong><button className="icon-button" aria-label="Close recovery check-in" onClick={onClose}><X size={16} /></button></div>{risk.isAtRisk && <p className="risk-toast-detail">{risk.hardestDay} is tightest — {risk.reason}.</p>}<div className="risk-toast-actions"><button className="secondary-button" onClick={onCheckWeek}>Check my week</button><button className="text-button" onClick={onAddTask}>Add a task</button></div></div>;
 }
 
 // Retrieval step of the RAG loop: pulls the student's own locally-stored data (schedule, check-ins,
@@ -1859,7 +1861,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     {showSurvivalPlan && <SurvivalPlanCard plan={weeklyPlan} onMoveTask={onMoveWeeklyTask} onLockBlock={onLockWeeklyBlock} onDismiss={onDismissSurvivalPlan} />}
     {!showFullWeek ? (
       <section className="card tasks-panel lock-in-panel">
-        {showDeprioritizedBanner && <div className="lockin-note" role="status"><span>Added — didn&apos;t make today&apos;s top 2.</span><button className="text-button" onClick={() => setShowFullWeek(true)}>See full list</button><button className="icon-button" aria-label="Dismiss added task notice" onClick={onDismissDeprioritizedBanner}><X size={14} /></button></div>}
+        {showDeprioritizedBanner && <div className="lockin-note" role="status"><span>Added — didn't make today's top 2.</span><button className="text-button" onClick={() => setShowFullWeek(true)}>See full list</button><button className="icon-button" aria-label="Dismiss added task notice" onClick={onDismissDeprioritizedBanner}><X size={14} /></button></div>}
         <div className="tasks-head"><div><span className="card-label">Today's Lock In</span><p className="card-subtitle">Things that matter most</p><div className="lock-in-legend"><span><i className="lock-in-legend-dot lock-in-legend-today" />Today</span><span><i className="lock-in-legend-dot lock-in-legend-tomorrow" />Tomorrow</span><span><i className="lock-in-legend-dot lock-in-legend-week" />This week</span></div></div></div>
         <div className="task-list">
           {lockInTasks.length ? lockInTasks.map(({ task, tag }) => renderTaskRow(task, tag, true)) : <div className="empty-state"><FileText size={19} /><span>No lock-in task right now.</span></div>}
