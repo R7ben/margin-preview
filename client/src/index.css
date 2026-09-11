@@ -415,6 +415,16 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .outcome-emoji-button:hover { background: #E1F1EE; }
 .outcome-summary-line { margin-top: 14px; color: var(--text-secondary); font-size: 12px; }
 .dashboard-actions, .reflection-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.dashboard-intro-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; }
+.survival-plan-card { border-left: 3px solid #1D9E75; }
+.survival-plan-card .section-kicker { margin-bottom: 4px; }
+.survival-plan-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-color); color: var(--text-primary); font-size: 12px; }
+.survival-plan-row:last-of-type { border-bottom: 0; }
+.survival-plan-row strong { display: block; font-size: 13px; }
+.survival-plan-row small { display: block; margin-top: 4px; color: var(--text-secondary); font-size: 11px; }
+.survival-plan-row .secondary-button { min-height: 32px; padding: 0 11px; font-size: 11px; white-space: nowrap; }
+.survival-plan-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+.survival-plan-actions .text-button { min-height: 32px; padding: 0 4px; font-size: 11px; }
 .quick-check-fab-wrap { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(80px + env(safe-area-inset-bottom)); z-index: 45; }
 .quick-check-fab { position: relative; display: inline-flex; width: 54px; height: 54px; align-items: center; justify-content: center; color: white; border-radius: 50%; background: var(--teal); box-shadow: 0 9px 22px rgba(27,34,48,.24); transition: transform 180ms ease-out, background 180ms ease-out, opacity 180ms ease-out; }
 .quick-check-fab:hover { background: #176E67; transform: translateY(-2px); }

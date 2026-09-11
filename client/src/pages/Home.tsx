@@ -101,6 +101,7 @@ type RecoveryBlock = {
   type: string;
   locked: boolean;
 };
+type WeeklyPlan = { hardestDay: string; loadDescription: string; taskToMove: FlexibleTask | null; blockToLock: RecoveryBlock | undefined };
 
 type Suggestion = {
   range: string;
@@ -144,6 +145,13 @@ const DEFAULT_RECOVERY_BLOCKS: RecoveryBlock[] = [
   { id: 102, day: "Thursday", startTime: "18:30", endTime: "19:30", type: "Screen-free wind-down", locked: false },
   { id: 103, day: "Sunday", startTime: "10:00", endTime: "11:00", type: "Sleep extension", locked: false },
 ];
+const currentWeekKey = () => {
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  return monday.toDateString();
+};
 
 const IMPORTED_TIMETABLE: FixedCommitment[] = [
   { id: 901, name: "Design studio", days: ["Mon", "Wed"], startTime: "09:00", endTime: "11:00", hours: 4 },
@@ -674,6 +682,8 @@ function App() {
   const [demoNotificationToken, setDemoNotificationToken] = useState(0);
   const [checkInNotice, setCheckInNotice] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [survivalPlanDismissedWeek, setSurvivalPlanDismissedWeek] = useState<string | null>(() => typeof window === "undefined" ? null : window.localStorage.getItem("survivalPlanDismissedWeek"));
+  const [showWeeklyPlanPreview, setShowWeeklyPlanPreview] = useState(false);
   const [guideStep, setGuideStep] = useState(0);
   const [guideReturnScreen, setGuideReturnScreen] = useState<Screen>("dashboard");
 
@@ -735,6 +745,16 @@ function App() {
   const triageBaseMargin = triageMarginOverride ?? calculation.margin;
   const remainingDeficit = triageOutcomeDeficit ?? Math.max(0, -triageBaseMargin - selectedRecovery);
   const deferCandidate = triageItems.length ? triageItems.reduce((best, task) => (task.estimatedHours > best.estimatedHours ? task : best), triageItems[0]) : null;
+  const weeklyPlan = useMemo<WeeklyPlan>(() => {
+    const hardestIndex = calculation.dailyMargins.reduce((lowest, margin, index, margins) => margin < margins[lowest] ? index : lowest, 0);
+    const hardestDay = DAYS[hardestIndex];
+    const dayLoad = tasks.filter((task) => !task.deferred && task.deadline.toLowerCase().startsWith(hardestDay.toLowerCase()));
+    const loadDescription = dayLoad.length ? `${dayLoad.length} ${dayLoad[0].category}-load task${dayLoad.length > 1 ? "s" : ""}, tight margin` : "tight margin";
+    const availableBlocks = recoveryBlocks.length ? recoveryBlocks : DEFAULT_RECOVERY_BLOCKS;
+    return { hardestDay, loadDescription, taskToMove: deferCandidate, blockToLock: availableBlocks.find((block) => !block.locked) };
+  }, [calculation.dailyMargins, tasks, recoveryBlocks, deferCandidate]);
+  const showSurvivalPlan = showWeeklyPlanPreview || survivalPlanDismissedWeek !== currentWeekKey();
+  const dismissSurvivalPlan = () => { const week = currentWeekKey(); setSurvivalPlanDismissedWeek(week); setShowWeeklyPlanPreview(false); if (typeof window !== "undefined") window.localStorage.setItem("survivalPlanDismissedWeek", week); };
   const showEnergyCheckIn = Math.min(...calculation.dailyMargins) < 5;
 
   const loadPattern = useMemo(() => {
@@ -1011,7 +1031,6 @@ function App() {
   };
 
   const navTo = (next: Screen) => {
-    console.log("[navTo] called, changing screen to:", next, "current screen was:", screen);
     if (next === "guide") { setGuideReturnScreen(screen); setGuideStep(0); }
     setTriageOutcome(null);
     setTriageOutcomeDeficit(null);
@@ -1028,7 +1047,6 @@ function App() {
 
   const isDarkScreen = screen === "mirror" || screen === "planner" || screen === "reflection" || screen === "import";
 
-  console.log("[render] rendering screen:", screen, "timestamp:", Date.now());
   return (
     <div className={`app-shell ${isDarkScreen ? "app-shell-dark" : "app-shell-light"}${screen === "dashboard" ? " app-shell-dashboard" : ""}`}>
       <div className="app-frame">
@@ -1081,6 +1099,12 @@ function App() {
                   onRecoveryQuality={(quality) => { setRecoveryQuality(quality); setRecoveryQualityDismissed(true); }}
                   onPlanner={() => navTo("planner")}
                   onReflection={() => navTo("reflection")}
+                  weeklyPlan={weeklyPlan}
+                  showSurvivalPlan={showSurvivalPlan}
+                  onMoveWeeklyTask={() => { if (weeklyPlan.taskToMove) setTasks((current) => current.map((task) => task.id === weeklyPlan.taskToMove?.id ? { ...task, deferred: true } : task)); }}
+                  onLockWeeklyBlock={() => { if (weeklyPlan.blockToLock) protectBlock(weeklyPlan.blockToLock.id); }}
+                  onDismissSurvivalPlan={dismissSurvivalPlan}
+                  onShowWeeklyPlan={() => setShowWeeklyPlanPreview(true)}
                   onTriage={() => openTriage()}
                   onRebalance={(day) => { setDraftDeadline(day); startMirror(); }}
                   onRecordOutcome={recordTaskOutcome}
@@ -1404,7 +1428,10 @@ function BurnoutRiskPanel({ atRiskDays, onRebalance }: { atRiskDays: DayRisk[]; 
   if (!atRiskDays.length) return <section className="burnout-panel burnout-balanced"><h3>✓ Week Looks Balanced</h3><p>No days are at high risk. Keep protecting recovery blocks.</p></section>;
   return <section className="burnout-panel"><h3>⚠️ Days at Risk</h3>{atRiskDays.map((day) => <div key={day.day} className={`risk-card risk-${day.riskLevel}`}><div className="risk-day"><strong>{fullDayName(day.day)}</strong><span>{day.riskLevel} risk · {formatShortHours(day.totalHours)} scheduled</span></div><div className="risk-narrative">{day.riskNarrative}</div><button className="btn-secondary-sm" onClick={() => onRebalance(day.day)}>Rebalance</button></div>)}</section>;
 }
-function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showEnergyCheckIn, showMorningCheckIn, onMorningCheckInRespond, onAddTask, onQuickCheck, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, onTriage, onRebalance, onRecordOutcome, onDeleteTaskSilently, onEnergyRespond }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; fixedCommitments: FixedCommitment[]; recoveryBlocks: RecoveryBlock[]; showEnergyCheckIn: boolean; showMorningCheckIn: boolean; onMorningCheckInRespond: (value: MoodValue) => void; onAddTask: () => void; onQuickCheck: () => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; onTriage: () => void; onRebalance: (day: string) => void; onRecordOutcome: (task: FlexibleTask, outcome: TaskOutcomeValue) => void; onDeleteTaskSilently: (id: number) => void; onEnergyRespond: (response: EnergyResponse) => void }) {
+function SurvivalPlanCard({ plan, onMoveTask, onLockBlock, onDismiss }: { plan: WeeklyPlan; onMoveTask: () => void; onLockBlock: () => void; onDismiss: () => void }) {
+  return <section className="card survival-plan-card"><div className="section-kicker"><ShieldCheck size={14} /><span>Protect This Week</span></div><div className="survival-plan-row"><div><strong>Hardest day: {plan.hardestDay}</strong><small>{plan.loadDescription}</small></div></div>{plan.taskToMove && <div className="survival-plan-row"><span>Move: “{plan.taskToMove.name}” → Sat</span><button className="secondary-button" onClick={onMoveTask}>Move it</button></div>}{plan.blockToLock && <div className="survival-plan-row"><span>Lock: {plan.blockToLock.day} {plan.blockToLock.type}</span><button className="secondary-button" onClick={onLockBlock}>Lock it</button></div>}<div className="survival-plan-actions"><button className="text-button" onClick={onDismiss}>Got it</button><button className="text-button" onClick={onDismiss}>Remind me Sunday</button></div></section>;
+}
+function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showEnergyCheckIn, showMorningCheckIn, onMorningCheckInRespond, onAddTask, onQuickCheck, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, weeklyPlan, showSurvivalPlan, onMoveWeeklyTask, onLockWeeklyBlock, onDismissSurvivalPlan, onShowWeeklyPlan, onTriage, onRebalance, onRecordOutcome, onDeleteTaskSilently, onEnergyRespond }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; fixedCommitments: FixedCommitment[]; recoveryBlocks: RecoveryBlock[]; showEnergyCheckIn: boolean; showMorningCheckIn: boolean; onMorningCheckInRespond: (value: MoodValue) => void; onAddTask: () => void; onQuickCheck: () => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; weeklyPlan: WeeklyPlan; showSurvivalPlan: boolean; onMoveWeeklyTask: () => void; onLockWeeklyBlock: () => void; onDismissSurvivalPlan: () => void; onShowWeeklyPlan: () => void; onTriage: () => void; onRebalance: (day: string) => void; onRecordOutcome: (task: FlexibleTask, outcome: TaskOutcomeValue) => void; onDeleteTaskSilently: (id: number) => void; onEnergyRespond: (response: EnergyResponse) => void }) {
   const [showFullWeek, setShowFullWeek] = useState(false);
   const [dailyView, setDailyView] = useState<"week" | "day">("week");
   const [dailyDate, setDailyDate] = useState(() => new Date());
@@ -1485,7 +1512,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     {showMorningCheckIn && <section className="card checkin-card"><span className="card-label">How do you feel today?</span><div className="pill-row">{MOOD_OPTIONS.map((option) => <button key={option.value} className={`pill pill-button ${moodPillTone[option.value]}`} onClick={() => onMorningCheckInRespond(option.value)}>{option.value}</button>)}</div></section>}
     {recoveryQualityBlock && !recoveryQualityDismissed && <RecoveryQualityCard block={recoveryQualityBlock} onSelect={onRecoveryQuality} />}
     {showEnergyCheckIn && <section className="card checkin-card"><span className="card-label">Heading into today...</span><div className="pill-row"><button className="pill pill-button pill-negative" onClick={() => onEnergyRespond("Rough")}>Rough</button><button className="pill pill-button pill-neutral" onClick={() => onEnergyRespond("Okay")}>Okay</button><button className="pill pill-button pill-positive" onClick={() => onEnergyRespond("Ready")}>Ready</button></div></section>}
-    <div className="dashboard-intro"><p className="eyebrow">Your week</p><h1 className="page-heading">Your Week</h1><p className="dashboard-subtitle">With recovery view</p><div className="dashboard-view-toggle"><button className={dailyView === "week" ? "dashboard-view-toggle-active" : ""} onClick={() => setDailyView("week")}>Week</button><button className={dailyView === "day" ? "dashboard-view-toggle-active" : ""} onClick={() => setDailyView("day")}>Day</button></div><button className="text-action dashboard-reflection-link" onClick={onReflection}><BarChart3 size={14} /> Weekly Reflection</button></div>
+    <div className="dashboard-intro"><p className="eyebrow">Your week</p><h1 className="page-heading">Your Week</h1><p className="dashboard-subtitle">With recovery view</p><div className="dashboard-view-toggle"><button className={dailyView === "week" ? "dashboard-view-toggle-active" : ""} onClick={() => setDailyView("week")}>Week</button><button className={dailyView === "day" ? "dashboard-view-toggle-active" : ""} onClick={() => setDailyView("day")}>Day</button></div><div className="dashboard-intro-links"><button className="text-action dashboard-reflection-link" onClick={onReflection}><BarChart3 size={14} /> Weekly Reflection</button><button className="text-action dashboard-reflection-link" onClick={onShowWeeklyPlan}><ShieldCheck size={14} /> Weekly Plan</button></div></div>
     {dailyView === "week" ? <>
     <section className="card hero-margin-card">
       <div className="hero-card-head"><span className="card-label">Recovery Margin</span><div className="status-pill" style={{ color: status.color, borderColor: `${status.color}44`, background: `${status.color}10` }}><span className="status-dot" style={{ background: status.color }} />{status.label}</div></div>
@@ -1532,6 +1559,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
         {CATEGORY_BREAKDOWN_ITEMS.map((item) => <div className="category-breakdown-legend-item" key={item.key}><span className="category-breakdown-dot" style={{ background: item.color }} />{item.label}<span className="category-breakdown-hours">{formatShortHours(calculation.categoryBreakdown[item.key])}</span></div>)}
       </div>
     </section>
+    {showSurvivalPlan && <SurvivalPlanCard plan={weeklyPlan} onMoveTask={onMoveWeeklyTask} onLockBlock={onLockWeeklyBlock} onDismiss={onDismissSurvivalPlan} />}
     {!showFullWeek ? (
       <section className="card tasks-panel lock-in-panel">
         <div className="tasks-head"><div><span className="card-label">Today's Lock In</span><p className="card-subtitle">Things that matter most</p><div className="lock-in-legend"><span><i className="lock-in-legend-dot lock-in-legend-today" />Today</span><span><i className="lock-in-legend-dot lock-in-legend-tomorrow" />Tomorrow</span><span><i className="lock-in-legend-dot lock-in-legend-week" />This week</span></div></div></div>
