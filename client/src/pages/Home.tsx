@@ -2525,7 +2525,6 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const threadRef = useRef<HTMLDivElement | null>(null);
-  const askedRef = useRef<string>("");
 
   useEffect(() => {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" });
@@ -2598,21 +2597,6 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
     }
   };
 
-  useEffect(() => {
-    const trimmedName = name.trim();
-    const question = trimmedName && hours > 0
-      ? `Can I fit "${trimmedName}" (${hours}h) into my week without burning out?`
-      : "Can I afford this?";
-    const askKey = `${trimmedName.toLowerCase()}|${hours}`;
-    if (askedRef.current === askKey) return;
-    const timer = setTimeout(() => {
-      askedRef.current = askKey;
-      sendChatMessage(question);
-    }, 700);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, hours]);
-
   return (
     <div className="sheet-backdrop" role="dialog" aria-modal="true">
       <div className="quick-sheet">
@@ -2645,8 +2629,8 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
           ))}
           {chatLoading && <div className="chat-bubble chat-bubble-assistant chat-bubble-loading"><Spinner className="size-3.5" /> Reading your schedule...</div>}
         </div>
-        <form className="chat-input-row" onSubmit={(event) => { event.preventDefault(); sendChatMessage(chatInput); }}>
-          <input className="text-input" placeholder="Ask about your week..." value={chatInput} onChange={(event) => setChatInput(event.target.value)} />
+        <form className="chat-input-row" onSubmit={(event) => { event.preventDefault(); void sendChatMessage(chatInput); }}>
+          <input className="text-input" placeholder="Ask about your week..." value={chatInput} onChange={(event) => setChatInput(event.target.value)} disabled={chatLoading} />
           <button type="submit" className="icon-button" aria-label="Send message" disabled={!chatInput.trim() || chatLoading}><Send size={17} /></button>
         </form>
         <div className="sheet-actions"><button className="secondary-button" onClick={onClose}>Close</button><button className="primary-button" onClick={onAdd}>Add to Schedule <ArrowRight size={16} /></button></div>
