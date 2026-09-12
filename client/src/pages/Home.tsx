@@ -2001,7 +2001,11 @@ function SurvivalPlanCard({ plan, onMoveTask, onLockBlock, onDismiss }: { plan: 
 function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showEnergyCheckIn, showMorningCheckIn, onMorningCheckInRespond, onAddQuickTask, onQuickCheck, onOpenActionSheet, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, weeklyPlan, showSurvivalPlan, onMoveWeeklyTask, onLockWeeklyBlock, onDismissSurvivalPlan, onShowWeeklyPlan, onTriage, onRebalance, onRecordOutcome, onEnergyRespond, lastToastTaskId, showDeprioritizedBanner, onDismissDeprioritizedBanner }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; fixedCommitments: FixedCommitment[]; recoveryBlocks: RecoveryBlock[]; showEnergyCheckIn: boolean; showMorningCheckIn: boolean; onMorningCheckInRespond: (value: MoodValue) => void; onAddQuickTask: (values: QuickAddValues) => void; onQuickCheck: () => void; onOpenActionSheet: (target: ActionSheetTarget) => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; weeklyPlan: WeeklyPlan; showSurvivalPlan: boolean; onMoveWeeklyTask: () => void; onLockWeeklyBlock: () => void; onDismissSurvivalPlan: () => void; onShowWeeklyPlan: () => void; onTriage: () => void; onRebalance: (day: string) => void; onRecordOutcome: (task: FlexibleTask, outcome: TaskOutcomeValue) => void; onEnergyRespond: (response: EnergyResponse) => void; lastToastTaskId: number | null; showDeprioritizedBanner: boolean; onDismissDeprioritizedBanner: () => void }) {
   const [showFullWeek, setShowFullWeek] = useState(false);
   const [dailyView, setDailyView] = useState<"week" | "day">("week");
-  const [dailyDate, setDailyDate] = useState(() => new Date());
+  const [dailyDate, setDailyDate] = useState(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  });
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [expandedDeadlineIds, setExpandedDeadlineIds] = useState<number[]>([]);
   const [showFabHint, setShowFabHint] = useState(() => typeof window !== "undefined" && !window.localStorage.getItem("marginFabHintSeen"));
