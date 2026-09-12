@@ -121,15 +121,8 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const CALENDAR_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const GUIDE_SEEN_KEY = "hasSeenOnboarding";
 const RING_CIRCUMFERENCE = 2 * Math.PI * 86;
-function BrandMark({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M8 3 L3.5 3 L3.5 8" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M16 21 L20.5 21 L20.5 16" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M16 3 L20.5 3 L20.5 8" stroke="var(--teal)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M8 21 L3.5 21 L3.5 16" stroke="var(--teal)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+function BrandMark({ className, dark = false }: { className?: string; dark?: boolean }) {
+  return <img className={className} src={dark ? "/margin-panda-dark.png" : "/margin-panda-light.png"} alt="" aria-hidden="true" />;
 }
 
 const initialFixedCommitments: FixedCommitment[] = [
@@ -1825,12 +1818,13 @@ function BottomTabBar({ active, onNavigate }: { active: Screen; onNavigate: (s: 
 }
 
 function NavDrawer({ open, activeScreen, onNavigate, onClose }: { open: boolean; activeScreen: Screen; onNavigate: (screen: Screen) => void; onClose: () => void }) {
+  const { theme } = useTheme();
   if (!open) return null;
   return (
     <div className="nav-drawer-backdrop" onClick={onClose}>
       <aside className="nav-drawer" role="dialog" aria-modal="true" aria-label="Navigation" onClick={(event) => event.stopPropagation()}>
         <div className="nav-drawer-head">
-          <div className="brand-lockup"><BrandMark className="brand-mark" /><span className="brand-wordmark">MARGIN</span></div>
+          <div className="brand-lockup"><BrandMark className="brand-mark" dark={theme === "dark"} /><span className="brand-wordmark">MARGIN</span></div>
           <button className="icon-button" aria-label="Close menu" onClick={onClose}><X size={18} /></button>
         </div>
         <nav className="nav-drawer-list">
@@ -1853,7 +1847,7 @@ function Header({ screen, isDark, onBack, onMenu, onHelp, onTestNotification, on
       <div className="topbar-inner">
         <button className="hamburger-btn" aria-label="Menu" onClick={onMenu}><Menu size={20} /></button>
         <div className="brand-lockup">
-          <BrandMark className="brand-mark" />
+          <BrandMark className="brand-mark" dark={theme === "dark"} />
           <span className="brand-wordmark">MARGIN</span>
         </div>
         {screen !== "guide" && <button className="help-button" aria-label="How it works" title="How it works" onClick={onHelp}>?</button>}

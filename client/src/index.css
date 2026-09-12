@@ -139,7 +139,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .topbar { min-height: 56px; padding-top: calc(12px + env(safe-area-inset-top)); background: #0b2e2b; border: none; box-shadow: none; }
 .topbar-inner { position: relative; display: flex; min-height: 56px; align-items: center; justify-content: center; padding: 0 16px; }
 .brand-lockup { display: inline-flex; align-items: center; gap: 8px; }
-.brand-mark { width: 20px; height: 20px; flex: 0 0 auto; }
+.brand-mark { width: 24px; height: 24px; flex: 0 0 auto; border-radius: 7px; object-fit: cover; }
 .brand-wordmark { font-size: 14px; letter-spacing: .18em; font-weight: 700; }
 .topbar-spacer { width: 20px; height: 20px; }
 .topbar-light, .topbar-dark { color: white; }
