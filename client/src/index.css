@@ -339,6 +339,8 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .daily-task-chip-physical { background: #EEF6DC; }
 .daily-task-chip-errands { background: #F1EEF6; }
 .daily-task-chip-social { background: #FAEDD9; }
+.daily-task-chip .flexibility-tag { margin-right: 4px; }
+.daily-blocked-bar .flexibility-tag { margin-right: 5px; vertical-align: middle; }
 .daily-empty-slot { color: #1F8A82; font-size: 11px; }
 .daily-blocked-bar { margin-bottom: 8px; padding: 7px 9px; color: var(--text-secondary); border-left: 3px solid #B9B7C4; background: #F1EEF6; font-size: 10px; }
 .daily-blocked-bar-interactive { display: block; width: 100%; border: 0; cursor: pointer; font: inherit; text-align: left; transition: background 180ms ease-out, border-color 180ms ease-out; }
@@ -399,6 +401,11 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .task-row-urgency-normal { border-left-color: #1D9E75; }
 .task-row-urgency-flexible { border-left-color: transparent; }
 .task-leading { display: flex; align-items: center; gap: 12px; }
+.flexibility-tag { display: inline-flex; flex: 0 0 auto; align-items: center; padding: 2px 7px; border: 1px solid var(--border-crisp); border-radius: 20px; color: var(--text-secondary); font-size: 9px; font-weight: 700; letter-spacing: .04em; line-height: 1.2; text-transform: uppercase; white-space: nowrap; }
+.flexibility-tag-fixed { color: #6B5B95; border-color: #8A78B8; background: rgba(138,120,184,.1); }
+.flexibility-tag-flexible { color: #1D8064; border-color: #1D9E75; background: rgba(29,158,117,.08); }
+.flexibility-tag-due-soon { color: #B35F12; border-color: #C97F1E; background: rgba(201,127,30,.1); }
+.flexibility-tag-can-defer { color: var(--text-secondary); border-color: var(--border-crisp); background: var(--surface-soft); }
 .task-icon { display: flex; width: 32px; height: 32px; align-items: center; justify-content: center; border-radius: 50%; }
 .task-icon-mental { color: var(--navy); background: #E1F1EE; }
 .task-icon-social { color: #C97F1E; background: #FAEDD9; }
