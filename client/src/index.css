@@ -672,6 +672,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .metric-sub-label { margin: 6px 0 0; color: var(--text-secondary); font-size: 10px; line-height: 1.4; }
 .metric-green .metric-label svg, .metric-green .metric-value span { color: #5C7A16; }
 .metric-amber .metric-label svg, .metric-amber .metric-value span { color: #C97F1E; }
+.metric-red .metric-label svg, .metric-red .metric-value span { color: #C1121F; }
 .metric-muted .metric-label svg, .metric-muted .metric-value span { color: var(--text-tertiary); }
 .stress-pattern-list { display: flex; flex-direction: column; margin-top: 12px; }
 .stress-pattern-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border-color); font-size: 13px; }
