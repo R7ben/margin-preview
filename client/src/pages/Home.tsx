@@ -816,6 +816,8 @@ function App() {
   const [commitmentDays, setCommitmentDays] = useState<string[]>([]);
   const [commitmentStart, setCommitmentStart] = useState("09:00");
   const [commitmentEnd, setCommitmentEnd] = useState("11:00");
+  const [pendingCommitment, setPendingCommitment] = useState<PendingCommitment | null>(null);
+  const [showCommitmentImpact, setShowCommitmentImpact] = useState(false);
   const [plannerMessage, setPlannerMessage] = useState("");
   const [unlockTarget, setUnlockTarget] = useState<number | "all" | null>(null);
   const [recoveryQuality, setRecoveryQuality] = useState<"Fully" | "Partially" | "Not really" | null>(null);
@@ -1248,19 +1250,34 @@ function App() {
     changeScreen("onboarding");
   };
 
-  const saveCommitment = () => {
-    if (!commitmentName.trim() || !commitmentDays.length) return;
-    setFixedCommitments((current) => [...current, {
-      id: Date.now(),
-      name: commitmentName.trim(),
-      days: commitmentDays,
-      startTime: commitmentStart,
-      endTime: commitmentEnd,
-      hours: Number((durationBetween(commitmentStart, commitmentEnd) * commitmentDays.length).toFixed(1)),
-    }]);
+  const commitPendingCommitment = (pending: PendingCommitment) => {
+    setFixedCommitments((current) => [...current, { id: Date.now(), name: pending.name, days: pending.days, startTime: pending.startTime, endTime: pending.endTime, hours: pending.hours }]);
     setCommitmentName("");
     setCommitmentDays([]);
     setShowCommitmentForm(false);
+    setPendingCommitment(null);
+    setShowCommitmentImpact(false);
+    toast.success(`Added ${pending.name} — you're now at ${pending.capacityAfterPercent}% capacity`);
+  };
+
+  const saveCommitment = () => {
+    if (!commitmentName.trim() || !commitmentDays.length) return;
+    const hoursPerDay = durationBetween(commitmentStart, commitmentEnd);
+    if (hoursPerDay <= 0) return;
+    const hours = Number((hoursPerDay * commitmentDays.length).toFixed(1));
+    const availableBefore = calculation.availableCapacity;
+    const availableAfter = Number((availableBefore - hours).toFixed(1));
+    const riskDays = commitmentDays.filter((day) => {
+      const dayIndex = DAYS.indexOf(day);
+      return dayIndex >= 0 && calculation.dailyMargins[dayIndex] - hoursPerDay < 2;
+    });
+    const pending = { name: commitmentName.trim(), days: commitmentDays, startTime: commitmentStart, endTime: commitmentEnd, hours, availableBefore, availableAfter, capacityAfterPercent: Math.round((1 - availableAfter / 168) * 100), riskDays } satisfies PendingCommitment;
+    if (hours > availableBefore) {
+      setPendingCommitment(pending);
+      setShowCommitmentImpact(false);
+      return;
+    }
+    commitPendingCommitment(pending);
   };
 
   const protectBlock = (id: number) => {
@@ -1548,6 +1565,7 @@ function App() {
             onAddAnywayOverride={addAnywayOverrideFromPreview}
           />
         )}
+        {pendingCommitment && <CommitmentCapacityModal pending={pendingCommitment} showImpact={showCommitmentImpact} onSeeImpact={() => setShowCommitmentImpact((current) => !current)} onAddAnyway={() => commitPendingCommitment(pendingCommitment)} onCancel={() => { setPendingCommitment(null); setShowCommitmentImpact(false); }} />}
         {showRecoveryMenu && <RecoveryMenu onClose={() => setShowRecoveryMenu(false)} />}
         {screen === "mirror" && (
           <div className="quick-check-fab-wrap">
@@ -1919,6 +1937,7 @@ const calculateWeeklyStressPattern = (moodChecks: MoodCheckIn[], dates: Date[], 
 type CalculationShape = { fixedTotal: number; recoveryBlockTotal: number; tier2Total: number; availableCapacity: number; flexTotal: number; margin: number; dailyMargins: number[]; dailyFixed: number[]; dailyRecoveryBlocks: number[]; dailyTask: number[]; longestRun: number; distributionWarning: boolean; status: ReturnType<typeof statusFor>; categoryBreakdown: { mental: number; physical: number; social: number; errands: number; time: number } };
 type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
 const useCalculationShape = null as unknown as () => CalculationShape;
+type PendingCommitment = { name: string; days: string[]; startTime: string; endTime: string; hours: number; availableBefore: number; availableAfter: number; capacityAfterPercent: number; riskDays: string[] };
 
 function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargin, projectedStatus, consequenceDay, dailyBreachAmount, sleepImpact, predictedHighLoadDays, sleepHours, energyType, setEnergyType, energyRecommendation, onAcceptEnergyRecommendation, showActions, confirmBreach, setDraftName, setDraftHours, setDraftDeadline, setShowActions, onAddAnyway, onTriage, onSplit, onFindSlot, onDefer, onChooseOption }: { draftName: string; draftHours: number; draftDeadline: string; projectedMargin: number; projectedStatus: ReturnType<typeof statusFor>; consequenceDay: string; dailyBreachAmount: number; sleepImpact: number; predictedHighLoadDays: number; sleepHours: number; energyType: EnergyType; setEnergyType: (value: EnergyType) => void; energyRecommendation: EnergyRecommendation; onAcceptEnergyRecommendation: (day: string) => void; showActions: boolean; confirmBreach: boolean; setDraftName: (value: string) => void; setDraftHours: (value: number) => void; setDraftDeadline: (value: string) => void; setShowActions: (value: boolean) => void; onAddAnyway: () => void; onTriage: () => void; onSplit: () => void; onFindSlot: () => void; onDefer: () => void; onChooseOption: (option: "addAnyway" | "split" | "defer" | "decline") => void }) {
   const [showSimulator, setShowSimulator] = useState(false);
@@ -2016,6 +2035,10 @@ function ConsequencePreview({ projectedMargin, consequenceDay, deferCandidate, o
     return <div className="sheet-backdrop consequence-backdrop" role="dialog" aria-modal="true" aria-labelledby="consequence-preview-title"><div className="consequence-modal"><div className="modal-kicker"><TriangleAlert size={17} /> Consequence Preview</div><h2 id="consequence-preview-title">This fits, but something should move.</h2><p className="modal-lede">Adding this tightens your margin to <strong>{formatHours(projectedMargin)}</strong>. {deferCandidate ? <>{deferCandidate.name} on {deferCandidate.deadline} is the best candidate to defer.</> : null}</p><div className="modal-actions"><button className="primary-button" onClick={onAddAndDefer}>Add it{deferCandidate ? ` + defer ${deferCandidate.name}` : ""}</button><button className="secondary-button" onClick={onSeeOptions}>See options</button></div></div></div>;
   }
   return <div className="sheet-backdrop consequence-backdrop" role="dialog" aria-modal="true" aria-labelledby="consequence-preview-title"><div className="consequence-modal"><div className="modal-kicker"><TriangleAlert size={17} /> Consequence Preview</div><h2 id="consequence-preview-title">Not this week.</h2><p className="modal-lede">This breaches your recovery floor on <strong>{consequenceDay}</strong>. I can help next week after {consequenceDay}.</p><div className="modal-actions"><button className="primary-button" onClick={onDeferToNextWeek}>Defer to next week</button><button className="text-button" onClick={onAddAnywayOverride}>Add anyway</button></div></div></div>;
+}
+
+function CommitmentCapacityModal({ pending, showImpact, onSeeImpact, onAddAnyway, onCancel }: { pending: PendingCommitment; showImpact: boolean; onSeeImpact: () => void; onAddAnyway: () => void; onCancel: () => void }) {
+  return <div className="sheet-backdrop consequence-backdrop" role="dialog" aria-modal="true" aria-labelledby="commitment-capacity-title"><div className="consequence-modal commitment-capacity-modal"><div className="modal-kicker"><TriangleAlert size={17} /> Capacity check</div><h2 id="commitment-capacity-title">⚠️ This commitment exceeds your available capacity</h2><div className="capacity-breakdown"><div><span>Current available</span><strong>{formatHours(pending.availableBefore)} hrs</strong></div><div><span>This task</span><strong>{formatHours(pending.hours)} hrs</strong></div><div><span>After adding</span><strong>{pending.capacityAfterPercent}% of your week</strong></div></div>{showImpact && <div className="commitment-impact"><strong>Days at risk</strong><p>{pending.riskDays.length ? pending.riskDays.join(", ") : "No single day falls below the recovery buffer, but weekly capacity is exceeded."}.</p><strong>Rebalance suggestion</strong><p>Reschedule one of the selected days or shorten this commitment before adding it.</p></div>}<div className="modal-actions"><button className="primary-button" onClick={onSeeImpact}>See Impact</button><button className="secondary-button" onClick={onAddAnyway}>Add Anyway</button><button className="text-button" onClick={onCancel}>Cancel</button></div></div></div>;
 }
 
 function RecoveryQualityCard({ block, onSelect }: { block: RecoveryBlock; onSelect: (quality: "Fully" | "Partially" | "Not really") => void }) {
