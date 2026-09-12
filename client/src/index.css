@@ -732,7 +732,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .confirm-commitment-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .confirm-commitment-ring-track, .confirm-commitment-ring-fill { fill: none; stroke-width: 8; }
 .confirm-commitment-ring-track { stroke: #e0e0e0; }
-.confirm-commitment-ring-fill { stroke-linecap: round; stroke-dasharray: 100; transition: stroke-dashoffset 600ms ease-in-out; }
+.confirm-commitment-ring-fill { stroke-linecap: round; stroke-dasharray: 100; transition: stroke-dashoffset 300ms ease-in-out; }
 .confirm-commitment-ring-good .confirm-commitment-ring-fill { stroke: #20b2aa; }
 .confirm-commitment-ring-tight .confirm-commitment-ring-fill { stroke: #ffd700; }
 .confirm-commitment-ring-overload .confirm-commitment-ring-fill { stroke: #e74c3c; }

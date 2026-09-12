@@ -1273,12 +1273,8 @@ function App() {
       return dayIndex >= 0 && calculation.dailyMargins[dayIndex] - hoursPerDay < 2;
     });
     const pending = { name: commitmentName.trim(), days: commitmentDays, startTime: commitmentStart, endTime: commitmentEnd, hours, availableBefore, availableAfter, capacityAfterPercent: Math.round((1 - availableAfter / 168) * 100), riskDays } satisfies PendingCommitment;
-    if (hours > availableBefore) {
-      setPendingCommitment(pending);
-      setShowCommitmentImpact(false);
-      return;
-    }
-    commitPendingCommitment(pending);
+    setPendingCommitment(pending);
+    setShowCommitmentImpact(false);
   };
 
   const protectBlock = (id: number) => {

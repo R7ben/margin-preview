@@ -23,12 +23,13 @@ export const ConfirmAddCommitmentModal = ({
 }: ConfirmAddCommitmentModalProps) => {
   const cancelRef = useRef<HTMLButtonElement>(null);
   const [visible, setVisible] = useState(false);
+  const [ringProgress, setRingProgress] = useState(0);
   const hoursRemaining = currentAvailable - taskDuration;
   const percentAfter = ((totalCommitted + taskDuration) / 168) * 100;
-  const displayPercent = percentAfter > 100 ? "100%+" : `${Math.round(percentAfter)}%`;
+  const displayPercent = `${Math.round(percentAfter)}%`;
   const boundedPercent = Math.min(100, Math.max(0, percentAfter));
   const isOverload = percentAfter > 90;
-  const isTight = !isOverload && percentAfter >= 70;
+  const isTight = !isOverload && percentAfter > 70;
   const tone = isOverload ? "overload" : isTight ? "tight" : "good";
   const message = isOverload
     ? `You'll be at ${displayPercent} capacity — this is overload.`
@@ -38,14 +39,18 @@ export const ConfirmAddCommitmentModal = ({
 
   useEffect(() => {
     setVisible(true);
+    const animationFrame = window.requestAnimationFrame(() => setRingProgress(boundedPercent));
     cancelRef.current?.focus();
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onCancel();
       if (event.key === "Tab" && event.shiftKey && document.activeElement === cancelRef.current) event.preventDefault();
     };
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onCancel]);
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [boundedPercent, onCancel]);
 
   const close = () => {
     setVisible(false);
@@ -56,14 +61,14 @@ export const ConfirmAddCommitmentModal = ({
   const noCapacity = currentAvailable <= 0;
 
   return (
-    <div className={`confirm-commitment-backdrop${visible ? " confirm-commitment-visible" : ""}`} role="dialog" aria-modal="true" aria-labelledby="confirm-commitment-title">
-      <div className="confirm-commitment-modal">
+    <div className={`confirm-commitment-backdrop${visible ? " confirm-commitment-visible" : ""}`} role="dialog" aria-modal="true" aria-labelledby="confirm-commitment-title" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
+      <div className="confirm-commitment-modal" onMouseDown={(event) => event.stopPropagation()}>
         <h2 id="confirm-commitment-title">Are you sure?</h2>
         <p className="confirm-commitment-subtitle">{taskName} will impact your week</p>
         <div className={`confirm-commitment-ring confirm-commitment-ring-${tone}`} role="img" aria-label={`${displayPercent} capacity`}>
           <svg viewBox="0 0 200 200" aria-hidden="true">
             <circle className="confirm-commitment-ring-track" cx="100" cy="100" r="92" />
-            <circle className="confirm-commitment-ring-fill" cx="100" cy="100" r="92" pathLength="100" style={{ strokeDashoffset: `${100 - boundedPercent}` }} />
+            <circle className="confirm-commitment-ring-fill" cx="100" cy="100" r="92" pathLength="100" style={{ strokeDashoffset: `${100 - ringProgress}` }} />
           </svg>
           <strong>{displayPercent}</strong><span>capacity</span>
         </div>
@@ -76,7 +81,7 @@ export const ConfirmAddCommitmentModal = ({
         {(tooLong || invalid || noCapacity) && <p className="confirm-commitment-warning">{tooLong ? "This task is longer than a week." : invalid ? "Task duration must be greater than zero." : "No capacity left this week — defer or reschedule another task."}</p>}
         <div className="confirm-commitment-actions">
           <button ref={cancelRef} type="button" className="confirm-commitment-cancel" onClick={close}>Cancel</button>
-          <button type="button" className="confirm-commitment-confirm" onClick={onConfirm} disabled={tooLong || invalid || noCapacity}>Yes, Add It</button>
+          <button type="button" className="confirm-commitment-confirm" onClick={onConfirm} disabled={tooLong || invalid}>Yes, Add It</button>
         </div>
       </div>
     </div>
