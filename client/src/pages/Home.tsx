@@ -2094,6 +2094,14 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
   const highCapacityDays = dailyCapacityTrend.filter((percent) => percent >= 85).length;
   const riskAnalysis = analyzeWeekRisk(tasks, fixedCommitments, recoveryBlocks);
   const atRiskDays = riskAnalysis.filter((day) => day.riskLevel !== "low");
+  const pressureDay = atRiskDays[0] ?? riskAnalysis[lowestDayIndex];
+  const pressurePoint = pressureDay.load.mental >= pressureDay.load.physical && pressureDay.load.mental >= pressureDay.load.social && pressureDay.load.mental >= pressureDay.load.fixed
+    ? "mental-load work"
+    : pressureDay.load.physical >= pressureDay.load.social && pressureDay.load.physical >= pressureDay.load.fixed
+      ? "physical work"
+      : pressureDay.load.social >= pressureDay.load.fixed
+        ? "social commitments"
+        : "fixed commitments";
   return <div className="dashboard-page">
     {showMorningCheckIn && <section className="card checkin-card"><span className="card-label">How do you feel today?</span><div className="pill-row">{MOOD_OPTIONS.map((option) => <button key={option.value} className={`pill pill-button ${moodPillTone[option.value]}`} onClick={() => onMorningCheckInRespond(option.value)}>{option.value}</button>)}</div></section>}
     {recoveryQualityBlock && !recoveryQualityDismissed && <RecoveryQualityCard block={recoveryQualityBlock} onSelect={onRecoveryQuality} />}
@@ -2102,6 +2110,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     {dailyView === "week" ? <>
     <section className="card hero-margin-card">
       <div className="hero-card-head"><span className="card-label">Rest and recovery time left</span><div className="status-pill" style={{ color: status.color, borderColor: `${status.color}44`, background: `${status.color}10` }}><span className="status-dot" style={{ background: status.color }} />{status.label}</div></div>
+      <div className="hero-status-summary"><strong>You're at {capacityPercent(calculation.margin)}% of your safe weekly capacity</strong><span>{fullDayName(pressureDay.day)} is {pressureDay.riskLevel === "high" ? "overloaded" : "tight"}. Your {pressurePoint} is the main pressure point.</span></div>
       <div className="progress-ring-wrap">
         <svg className="progress-ring-svg" viewBox="0 0 200 200">
           <circle className="progress-ring-track" cx="100" cy="100" r="86" />
