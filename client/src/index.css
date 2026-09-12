@@ -750,6 +750,8 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .confirm-commitment-deferrals-label { color: var(--text-secondary); font-size: 11px; font-weight: 700; }
 .confirm-commitment-defer { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 38px; padding: 8px 10px; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); font-size: 12px; text-align: left; }
 .confirm-commitment-defer:hover { border-color: var(--teal); background: var(--pill-teal-bg); }
+.confirm-commitment-defer-label { display: inline-flex; min-width: 0; align-items: center; gap: 8px; }
+.confirm-commitment-checkbox { width: 14px; height: 14px; flex: 0 0 auto; border: 1px solid var(--text-tertiary); border-radius: 3px; background: var(--bg-secondary); }
 .confirm-commitment-defer strong { color: var(--text-secondary); font-family: var(--font-mono); font-size: 11px; }
 .confirm-commitment-deferred-count { margin: 8px 0 0; color: #168f89; font-size: 12px; font-weight: 700; text-align: center; }
 .confirm-commitment-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }.confirm-commitment-actions button { min-height: 48px; border-radius: 8px; font-size: 16px; font-weight: 700; }.confirm-commitment-cancel { color: #0e5449; background: #dcf1ec; }.confirm-commitment-confirm { color: #fff; background: #0b2e2b; }

@@ -97,8 +97,8 @@ export const ConfirmAddCommitmentModal = ({
           <div><span>After adding</span><strong>{displayPercent} of your week</strong></div>
         </div>
         {blocked && <p className="confirm-commitment-warning">This won't fit. Reschedule or defer a lower-priority task to make room:</p>}
-        {blocked && deferrableTasks.length > 0 && <div className="confirm-commitment-deferrals"><span className="confirm-commitment-deferrals-label">Deferrable tasks (shortest first)</span>{deferrableTasks.map((task) => <button key={task.id} type="button" className="confirm-commitment-defer" onClick={() => deferTask(task)}><span>{task.name}</span><strong>{task.estimatedHours.toFixed(1)} hrs</strong></button>)}</div>}
-        {deferredCount > 0 && <p className="confirm-commitment-deferred-count">You've deferred {deferredCount} task{deferredCount === 1 ? "" : "s"} to make room.</p>}
+        {((percentAfter > 85 && deferredCount === 0) || blocked) && deferrableTasks.length > 0 && <div className="confirm-commitment-deferrals"><span className="confirm-commitment-deferrals-label">Reschedule or defer a task to make room:</span>{deferrableTasks.map((task) => <button key={task.id} type="button" className="confirm-commitment-defer" onClick={() => deferTask(task)}><span className="confirm-commitment-defer-label"><span className="confirm-commitment-checkbox" aria-hidden="true" />{task.name}</span><strong>{task.estimatedHours.toFixed(1)} hrs · Defer</strong></button>)}</div>}
+        {deferredCount > 0 && <p className="confirm-commitment-deferred-count">{deferredCount} task{deferredCount === 1 ? "" : "s"} deferred</p>}
         <div className="confirm-commitment-actions">
           <button ref={cancelRef} type="button" className="confirm-commitment-cancel" onClick={close}>Cancel</button>
           <button type="button" className="confirm-commitment-confirm" onClick={onConfirm} disabled={blocked}>Yes, Add It</button>
