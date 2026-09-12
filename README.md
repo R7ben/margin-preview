@@ -294,7 +294,7 @@ No hard blocks. No hidden warnings. Just cost and choice, side by side.
 
 **System Architecture Diagram:**
 
-![System Architecture](architecture-diagram.png)
+![System Architecture](https://drive.google.com/file/d/1q2hq3ELls_8B05EADAlSwfK4jOSJ6kfb/view?usp=sharing)
 
 Margin is a stateless, client-side-first prototype. All capacity calculations (Recovery Floor, Days at Risk, Consequence Preview, category clustering) run locally in the browser for real-time performance and privacy. The backend exists only to proxy Gemini API calls, keeping the API key secure. Refresh resets all state; this is intentional. A production version would add cross-session persistence and user accounts.
 
