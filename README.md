@@ -8,8 +8,11 @@
 - 
 
 **Video Presentation:** [Unlisted YouTube Link — TBD]
+
 **Presentation Slides:** [Public Link — TBD]
+
 **Live Prototype:** [https://margin-preview-six.vercel.app/](https://margin-preview-six.vercel.app/)
+
 **GitHub Repository:** [https://github.com/R7ben/margin](https://github.com/R7ben/margin)
 
 *Access Note for Evaluators: To test the live prototype without cached state, please open the link in an incognito or private browser window. All data runs locally within the session.*
@@ -129,18 +132,20 @@ Our ideation happened mostly in a running WhatsApp thread alongside in-person me
 | **4. Feature Backlog** — including what we later cut | https://drive.google.com/file/d/1_IbqOnz7amvy9eKNcVd-5KPujuL0loWi/view?usp=sharing | A working planning doc showing gamification wasn't just considered and skipped — it was actively drafted: "Remove the weekly reflector and replace it with score streak," plus badges, achievement, and ranking. We built this out before cutting it after mentor feedback (Sept 7) confirmed our own instinct that it undercut the "recovery isn't a game" positioning. Also visible: real bug tracking and the pitch angle we prioritized. |
 | **5. Supporting Research** — burnout as observable behavior | https://drive.google.com/file/d/1fvBn5VmMGJrwNU6KI5C1wbJBwRs7A7H1/view?usp=sharing | Before deciding what to track, we researched what burnout actually looks like physically and behaviorally — jaw clenching, shallow breathing, revenge bedtime procrastination — each cited to sources. This grounded our five-category load model in real symptomatology and is part of why we rejected invasive tracking (Board 2) in favor of a self-reported, low-friction check-in. |
 
-#### Board 6: Affinity Diagram — Primary Research Themes (n=37)
+#### Board 6: Affinity Diagram — Primary Research Themes (n=40)
 
-**Method:** Clustered free-text survey responses ("What would've helped you realize earlier you were overloaded?") from our 37-student survey, cross-referenced against overcommitment/timing/consequence patterns.
+**Method:** Clustered free-text survey responses ("What would've helped you realize earlier you were overloaded?") from our 40-student survey, cross-referenced against overcommitment/timing/consequence patterns.
 
 | Theme | Response Share | What It Validates |
 |---|---|---|
-| "I wanted to SEE it, not just feel it" | 14 of 37 | Unprompted requests for visibility tools ("a scheduler," "a list of ongoing tasks so I can visibly see my current workload") — directly validates the Workload Visualizer. |
-| "I only found out when it was too late" | 30 of 37 | Didn't recognize overload until mid-week or later — validates the "burnout without warning" framing at the core of the problem statement. |
-| "Someone else noticed before I did" | Recurring | "A friend's comment about my exhausted face," "when someone finally told me to slow down" — students rely on external cues, not self-monitoring, validating a proactive system flag (Days at Risk) over passive tracking. |
-| "Uncertainty is itself the problem" | 9 of 37 said "Not sure" | Combined with confirmed overload, 95% either experienced it or couldn't rule it out — direct evidence of the visibility gap Margin solves. |
+| "I wanted to SEE it, not just feel it" | 10 of 40 | Unprompted requests for visibility tools ("a scheduler," "a list of ongoing tasks so I can visibly see my current workload," "tracking daily time use earlier") — directly validates the Workload Visualizer. |
+| "I only found out when it was too late" | 32 of 40 | Didn't recognize overload until mid-week or later — validates the "burnout without warning" framing at the core of the problem statement. |
+| "Someone else noticed before I did" | 3 of 40 (recurring pattern) | "A friend's comment about my exhausted face," "when someone finally told me to slow down," "a reminder from someone" — students rely on external cues, not self-monitoring, validating a proactive system flag (Days at Risk) over passive tracking. |
+| "Uncertainty is itself the problem" | 9 of 40 said "Not sure" | Combined with the 28 who confirmed overload, 92% either experienced it or couldn't rule it out — direct evidence of the visibility gap Margin solves. |
 
-*Caption: Real primary research from 37 university students — not synthesized personas. Combined with Boards 1–5, this is our unfair advantage over generic AI-drafted submissions: we have both the "how we thought" trail and the "why we're right" data.*
+**Chart Preview:** [Chart](https://drive.google.com/file/d/1kAvrNvbi4LFvvFNiplbFeDQBzEM2UfZX/view?usp=sharing)
+
+**Data link:** [Full survey responses](https://docs.google.com/spreadsheets/d/1ZS2FUt6SuVzEhZqlFxVxtfVktdq01nd4yVZC0ff5zD4/edit?usp=sharing)
 
 ### 2.3 Mentor Consultation
 
@@ -170,7 +175,7 @@ Our ideation happened mostly in a running WhatsApp thread alongside in-person me
 
 ## 3. Design & Prototype
 
-**Live Prototype:** [https://margin-preview-six.vercel.app/](https://margin-preview-six.vercel.app/)
+**Live Prototype:** [Deployment](https://margin-preview-six.vercel.app/)
 
 **How to Access:** Open the link in an incognito/private window to verify it loads without cached state. All user data is browser-session-only; refresh clears everything.
 
@@ -178,14 +183,14 @@ Our ideation happened mostly in a running WhatsApp thread alongside in-person me
 
 | Screen & Focus | UI Visual & Layout Context | Interaction & Behavioral Flow |
 |---|---|---|
-| **Screen 1: Onboarding** *(Live Capacity Calculation)* | Recovery Floor setup with sleep and decompression sliders; Live Calculation circle showing 56% available, 94 hrs comfortable. https://drive.google.com/file/d/1HYMkqzj5gYd1k5jyhThJtGZwP0sng3hO/view?usp=sharing | Before adding any tasks, the student sets non-negotiable recovery (sleep: 7 hrs, decompression: 1 hr). Margin immediately calculates available capacity: 168 total hours − 56 recovery floor − 18 fixed commitments = 94 hours available. Recovery is locked in first; everything else competes for what's left. |
-| **Screen 2: Today Dashboard** *(Capacity at a Glance)* | Mood check-in (Drained/Okay/Good/Energized), week capacity bar chart by day, Days at Risk callout for Thursday flagged HIGH RISK with 15.5H scheduled. https://drive.google.com/file/d/1f6x9RgRt7zui3OSiJUWyPgKsgorFNZdp/view?usp=sharing | Student lands on Today with a two-part mood check. Week capacity is visualized: each day shows mental/physical/social/time load stacked. Thursday is immediately flagged as HIGH RISK because it breaches the recovery floor. No hidden warnings; the cost is visible. |
-| **Screen 3: Quick Check Modal** *("Can I Afford This?")* | Modal with two inputs: "What are you being asked to do?" and "Ask about your week," returning a burnout risk score with delta. https://drive.google.com/file/d/1P5auNTTlWuIRXpwkVotNO7imrtFWnYZq/view?usp=sharing | Student types a specific task. Margin reads their actual schedule and recovery state, queries Gemini, and returns a concrete answer with before/after burnout risk. The student sees the cost before committing. |
-| **Screen 4: Consequence Preview Modal** *(Task Addition Cost)* | Modal showing before/after capacity impact. Circle gauge showing capacity shift, breakdown of the load added. https://drive.google.com/file/d/1XFvHCNEjBT3qbLff5PG8C7ugVw5rSHZw/view?usp=sharing | When adding a task that pushes capacity high, a modal intercepts with before/after gauges. Buttons: Add Anyway (soft-friction), Reschedule, See Impact. No hard block; the cost is just visible. |
-| **Screen 5: Today's Lock In** *(Category-Based Clustering)* | Tasks grouped by category. MUST-DO bucket with collapsed header "Mental load · 3 tasks · 13.5 hrs" with task chips underneath. MAINTENANCE bucket with ungrouped single tasks. https://drive.google.com/file/d/11FeOpdAs18R-ABwcXub_3MjJXguHxK4P/view?usp=sharing | Tasks are grouped by category when 2+ share the same load type. One click expands/collapses the group. Reduces cognitive load of reading flat rows; clarifies the pattern immediately. |
-| **Screen 6: Weekly Reflection** *(Stress Pattern & Next Week)* | Reflection summary: Recovery Maintained, Floor Breaches, Mood Trend, Next Week Insight. https://drive.google.com/file/d/1fjE01NIXcLYFZGqtR7jj5OMcduPq9QYv/view?usp=sharing | End-of-week screen correlates recovery floor breaches with mood trend, staging next week's starting point. Pattern-aware planning, not just tracking. |
-| **Screen 7: Planner View** *(Full Week Overview)* | All tasks for the week organized by day. Fixed commitments and flexible tasks shown with load category icons. https://drive.google.com/file/d/1iYewFXJRc0xw6hTOoaC8XFXGI7FtNAeP/view?usp=sharing | Full week view gives strategic overview. Drag-to-reschedule or use "Easier Options" (split into smaller blocks, defer something, find a slot) to rebalance without hard entry friction. |
-| **Screen 8: Recovery Planner** *(Auto-Suggested Blocks)* | Proactive suggestions after high-load days. Buttons: Protect, Edit, Lock All. https://drive.google.com/file/d/1MXFvBM1UoLs8i6o0KoKgGPiqmzaeFtvE/view?usp=sharing | After 2+ consecutive high-load days, Margin proactively suggests specific recovery blocks with type, time slot, and reasoning. Recovery is scheduled, not aspirational. |
+| **Screen 1: Onboarding** *(Live Capacity Calculation)* | Recovery Floor setup with sleep and decompression sliders; Live Calculation circle showing 56% available, 94 hrs comfortable.[Screen 1](https://drive.google.com/file/d/1HYMkqzj5gYd1k5jyhThJtGZwP0sng3hO/view?usp=sharing) | Before adding any tasks, the student sets non-negotiable recovery (sleep: 7 hrs, decompression: 1 hr). Margin immediately calculates available capacity: 168 total hours − 56 recovery floor − 18 fixed commitments = 94 hours available. Recovery is locked in first; everything else competes for what's left. |
+| **Screen 2: Today Dashboard** *(Capacity at a Glance)* | Mood check-in (Drained/Okay/Good/Energized), week capacity bar chart by day, Days at Risk callout for Thursday flagged HIGH RISK with 15.5H scheduled. [Screen 2](https://drive.google.com/file/d/1f6x9RgRt7zui3OSiJUWyPgKsgorFNZdp/view?usp=sharing) | Student lands on Today with a two-part mood check. Week capacity is visualized: each day shows mental/physical/social/time load stacked. Thursday is immediately flagged as HIGH RISK because it breaches the recovery floor. No hidden warnings; the cost is visible. |
+| **Screen 3: Quick Check Modal** *("Can I Afford This?")* | Modal with two inputs: "What are you being asked to do?" and "Ask about your week," returning a burnout risk score with delta.[Screen 3](https://drive.google.com/file/d/1P5auNTTlWuIRXpwkVotNO7imrtFWnYZq/view?usp=sharing) | Student types a specific task. Margin reads their actual schedule and recovery state, queries Gemini, and returns a concrete answer with before/after burnout risk. The student sees the cost before committing. |
+| **Screen 4: Consequence Preview Modal** *(Task Addition Cost)* | Modal showing before/after capacity impact. Circle gauge showing capacity shift, breakdown of the load added.[Screen 4](https://drive.google.com/file/d/1XFvHCNEjBT3qbLff5PG8C7ugVw5rSHZw/view?usp=sharing) | When adding a task that pushes capacity high, a modal intercepts with before/after gauges. Buttons: Add Anyway (soft-friction), Reschedule, See Impact. No hard block; the cost is just visible. |
+| **Screen 5: Today's Lock In** *(Category-Based Clustering)* | Tasks grouped by category. MUST-DO bucket with collapsed header "Mental load · 3 tasks · 13.5 hrs" with task chips underneath. MAINTENANCE bucket with ungrouped single tasks.[Screen 5](https://drive.google.com/file/d/11FeOpdAs18R-ABwcXub_3MjJXguHxK4P/view?usp=sharing) | Tasks are grouped by category when 2+ share the same load type. One click expands/collapses the group. Reduces cognitive load of reading flat rows; clarifies the pattern immediately. |
+| **Screen 6: Weekly Reflection** *(Stress Pattern & Next Week)* | Reflection summary: Recovery Maintained, Floor Breaches, Mood Trend, Next Week Insight. [Screen 6](https://drive.google.com/file/d/1fjE01NIXcLYFZGqtR7jj5OMcduPq9QYv/view?usp=sharing) | End-of-week screen correlates recovery floor breaches with mood trend, staging next week's starting point. Pattern-aware planning, not just tracking. |
+| **Screen 7: Planner View** *(Full Week Overview)* | All tasks for the week organized by day. Fixed commitments and flexible tasks shown with load category icons. [Screen 7](https://drive.google.com/file/d/1iYewFXJRc0xw6hTOoaC8XFXGI7FtNAeP/view?usp=sharing) | Full week view gives strategic overview. Drag-to-reschedule or use "Easier Options" (split into smaller blocks, defer something, find a slot) to rebalance without hard entry friction. |
+| **Screen 8: Recovery Planner** *(Auto-Suggested Blocks)* | Proactive suggestions after high-load days. Buttons: Protect, Edit, Lock All. [Screen 8](https://drive.google.com/file/d/1MXFvBM1UoLs8i6o0KoKgGPiqmzaeFtvE/view?usp=sharing) | After 2+ consecutive high-load days, Margin proactively suggests specific recovery blocks with type, time slot, and reasoning. Recovery is scheduled, not aspirational. |
 
 ### 3.2 Prototype Philosophy
 
