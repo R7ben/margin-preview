@@ -720,6 +720,22 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .capacity-breakdown { display: grid; gap: 8px; margin: 18px 0; }
 .capacity-breakdown > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 13px; border-radius: 10px; background: var(--bg-primary); color: var(--text-secondary); font-size: 12px; }
 .capacity-breakdown strong { color: var(--text-primary); font-family: var(--font-mono); }
+.capacity-trend { margin: 18px 0 4px; padding-top: 16px; border-top: 1px solid var(--border-color); }
+.capacity-trend-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.capacity-trend-scale { color: var(--text-tertiary); font-size: 10px; }
+.capacity-trend-list { display: grid; gap: 7px; margin-top: 12px; }
+.capacity-trend-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) 38px; align-items: center; gap: 8px; }
+.capacity-trend-day { color: var(--text-secondary); font-family: var(--font-mono); font-size: 11px; }
+.capacity-trend-track { height: 8px; overflow: hidden; border-radius: 999px; background: var(--border-color); }
+.capacity-trend-fill { display: block; height: 100%; min-width: 4px; border-radius: inherit; transition: width 300ms ease-out; }
+.capacity-trend-fill-good { background: #20B2AA; }
+.capacity-trend-fill-tight { background: #FFD700; }
+.capacity-trend-fill-overload { background: #E74C3C; }
+.capacity-trend-percent { font-family: var(--font-mono); font-size: 11px; text-align: right; }
+.capacity-trend-percent-good { color: #168f89; }
+.capacity-trend-percent-tight { color: #9a7b00; }
+.capacity-trend-percent-overload { color: #c6382d; }
+.capacity-trend-note { margin: 12px 0 0; color: var(--text-secondary); font-size: 11px; font-style: italic; line-height: 1.45; }
 .commitment-impact { margin: 12px 0 18px; padding: 13px; border-left: 3px solid var(--amber); border-radius: 8px; background: var(--pill-amber-bg); color: var(--pill-amber-text); font-size: 12px; line-height: 1.45; }
 .commitment-impact p { margin: 4px 0 12px; }
 .confirm-commitment-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.5); opacity: 0; transition: opacity 200ms ease; }

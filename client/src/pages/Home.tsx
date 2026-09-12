@@ -1851,6 +1851,8 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
   const energyPillTone: Record<EnergyResponse, string> = { Rough: "pill-negative", Okay: "pill-neutral", Ready: "pill-positive" };
   const totalCategoryHours = Object.values(calculation.categoryBreakdown).reduce((sum, value) => sum + value, 0);
   const maxDailyMargin = Math.max(...calculation.dailyMargins, 1);
+  const dailyCapacityTrend = calculation.dailyMargins.map((margin) => Math.round(Math.max(0, Math.min(1, (24 - margin) / 24)) * 100));
+  const highCapacityDays = dailyCapacityTrend.filter((percent) => percent >= 85).length;
   const riskAnalysis = analyzeWeekRisk(tasks, fixedCommitments, recoveryBlocks);
   const atRiskDays = riskAnalysis.filter((day) => day.riskLevel !== "low");
   return <div className="dashboard-page">
@@ -1871,6 +1873,11 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
           <p className="margin-hours-secondary">{formatHours(calculation.margin)} available</p>
           <span className="trend-copy"><span className="trend-arrow">{calculation.flexTotal > 0 ? "↓" : "→"}</span> {calculation.flexTotal > 0 ? "Shrinking" : "Holding"}</span>
         </div>
+      </div>
+      <div className="capacity-trend" aria-label="This week's daily capacity">
+        <div className="capacity-trend-heading"><span className="card-label">This week's capacity</span><span className="capacity-trend-scale">Mon–Sun</span></div>
+        <div className="capacity-trend-list">{DAYS.map((day, index) => { const percent = dailyCapacityTrend[index]; const tone = percent >= 91 ? "overload" : percent >= 71 ? "tight" : "good"; return <div className="capacity-trend-row" key={day}><span className="capacity-trend-day">{day}</span><span className="capacity-trend-track"><span className={`capacity-trend-fill capacity-trend-fill-${tone}`} style={{ width: `${Math.max(4, percent)}%` }} /></span><strong className={`capacity-trend-percent capacity-trend-percent-${tone}`}>{percent}%</strong></div>; })}</div>
+        {highCapacityDays > 0 && <p className="capacity-trend-note">You've been at 85%+ capacity {highCapacityDays} day{highCapacityDays === 1 ? "" : "s"} this week. Consider evening the load.</p>}
       </div>
       <p className="hero-substat">{headline}{showRiskLine ? ` Your week has room. ${lowestDay} doesn't.` : ""}</p>
       <div className="margin-footer"><span>{status.copy}</span><span className="trend-copy"><small>{calculation.flexTotal > 0 ? `was ${formatHours(calculation.margin + calculation.flexTotal)} before flexible commitments` : "no flexible commitments are using the margin"}</small></span></div>
