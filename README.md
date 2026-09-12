@@ -5,12 +5,10 @@
 
 **Team:**
 - Sapttaruben A/L Krishnan
-- [Member 2 — TBD]
-- [Member 3 — TBD]
+- 
 
 **Video Presentation:** [Unlisted YouTube Link — TBD]
 **Presentation Slides:** [Public Link — TBD]
-
 **Live Prototype:** [https://margin-preview-six.vercel.app/](https://margin-preview-six.vercel.app/)
 **GitHub Repository:** [https://github.com/R7ben/margin](https://github.com/R7ben/margin)
 
@@ -293,8 +291,7 @@ No hard blocks. No hidden warnings. Just cost and choice, side by side.
 | **Hosting** | Vercel | Free tier with zero-config GitHub deployments. | Serverless cold-starts and function timeouts during the Gemini API roundtrip present a live risk. |
 
 **System Architecture Diagram:**
-
-![System Architecture](https://drive.google.com/file/d/1q2hq3ELls_8B05EADAlSwfK4jOSJ6kfb/view?usp=sharing)
+https://drive.google.com/file/d/1q2hq3ELls_8B05EADAlSwfK4jOSJ6kfb/view?usp=sharing
 
 Margin is a stateless, client-side-first prototype. All capacity calculations (Recovery Floor, Days at Risk, Consequence Preview, category clustering) run locally in the browser for real-time performance and privacy. The backend exists only to proxy Gemini API calls, keeping the API key secure. Refresh resets all state; this is intentional. A production version would add cross-session persistence and user accounts.
 
