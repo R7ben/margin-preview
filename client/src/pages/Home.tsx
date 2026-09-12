@@ -2024,8 +2024,6 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
   const headline = status.label === "Critical" || status.label === "Breached" ? "Two things need to move." : calculation.distributionWarning || anyRiskDay ? `${lowestDay} needs attention.` : "You're protected this week.";
   const showRiskLine = headline !== "You're protected this week.";
   const activeTasks = tasks.filter((task) => !task.deferred);
-  const mustDo = pickMustDo(tasks);
-  const maintenance = pickMaintenance(tasks, mustDo?.id);
   const today = new Date();
   const weekMonday = new Date(today);
   weekMonday.setHours(0, 0, 0, 0);
@@ -2049,11 +2047,12 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     if (next < weekMonday || next > weekSunday) return;
     setDailyDate(next);
   };
-  const lockInTasks = [mustDo ? { task: mustDo, tag: "Must-do" } : null, maintenance ? { task: maintenance, tag: "Maintenance" } : null].filter((item): item is { task: FlexibleTask; tag: string } => Boolean(item)).sort((a, b) => {
+  const lockInTasks = activeTasks.map((task) => ({ task, tag: ["critical", "urgent"].includes(taskUrgency(task.deadline, today).tier) ? "Must-do" : "Maintenance" })).sort((a, b) => {
     const urgencyRank: Record<TaskUrgency, number> = { critical: 0, urgent: 1, normal: 2, flexible: 3 };
     const aUrgency = taskUrgency(a.task.deadline, today);
     const bUrgency = taskUrgency(b.task.deadline, today);
-    return urgencyRank[aUrgency.tier] - urgencyRank[bUrgency.tier] || a.task.estimatedHours - b.task.estimatedHours;
+    const bucketRank = (tag: string) => tag === "Must-do" ? 0 : 1;
+    return bucketRank(a.tag) - bucketRank(b.tag) || urgencyRank[aUrgency.tier] - urgencyRank[bUrgency.tier] || a.task.estimatedHours - b.task.estimatedHours;
   });
   const lockInBuckets = Array.from(lockInTasks.reduce((buckets, item) => {
     const bucket = buckets.get(item.tag) ?? [];
