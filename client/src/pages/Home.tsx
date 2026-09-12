@@ -118,6 +118,7 @@ type Suggestion = {
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const CALENDAR_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const GUIDE_SEEN_KEY = "hasSeenOnboarding";
 const RING_CIRCUMFERENCE = 2 * Math.PI * 86;
 function BrandMark({ className }: { className?: string }) {
   return (
@@ -857,6 +858,17 @@ function App() {
   const [showWeeklyPlanPreview, setShowWeeklyPlanPreview] = useState(false);
   const [guideStep, setGuideStep] = useState(0);
   const [guideReturnScreen, setGuideReturnScreen] = useState<Screen>("dashboard");
+
+  const markGuideSeen = () => {
+    if (typeof window !== "undefined") window.localStorage.setItem(GUIDE_SEEN_KEY, "true");
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || window.localStorage.getItem(GUIDE_SEEN_KEY) === "true") return;
+    setGuideReturnScreen(screen);
+    setGuideStep(0);
+    setScreen("guide");
+  }, []);
 
   const renderDiagnostics = renderDiagnosticsRef.current;
   if (renderDiagnostics.screen !== screen) {
@@ -1703,7 +1715,7 @@ function App() {
                 />
               )}
               {screen === "settings" && <Settings onBack={() => navTo("dashboard")} />}
-              {screen === "guide" && <Guide step={guideStep} setStep={setGuideStep} onClose={() => changeScreen(guideReturnScreen)} onDone={() => navTo("dashboard")} />}
+              {screen === "guide" && <Guide step={guideStep} setStep={setGuideStep} onClose={() => { markGuideSeen(); changeScreen(guideReturnScreen); }} onDone={() => { markGuideSeen(); navTo("dashboard"); }} />}
               {screen === "outcomes-summary" && protectedOutcomes && <OutcomesSummary outcomes={protectedOutcomes} riskRepairMessage={riskRepairMessage} onDashboard={() => navTo("dashboard")} />}
             </main>
           </>
