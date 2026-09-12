@@ -103,6 +103,11 @@ type RecoveryBlock = {
   locked: boolean;
 };
 type WeeklyPlan = { hardestDay: string; loadDescription: string; taskToMove: FlexibleTask | null; blockToLock: RecoveryBlock | undefined };
+type QuickAddValues = { name: string; day: string; hours: number; category: "auto" | TaskCategory; energy: EnergyType; split: boolean };
+type ActionSheetTarget =
+  | { kind: "task"; item: FlexibleTask }
+  | { kind: "fixed"; item: FixedCommitment }
+  | { kind: "recovery"; item: RecoveryBlock };
 
 type Suggestion = {
   range: string;
@@ -799,6 +804,10 @@ function App() {
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState("");
   const [editingImportId, setEditingImportId] = useState<number | null>(null);
+  const [actionSheetTarget, setActionSheetTarget] = useState<ActionSheetTarget | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [editingFixedCommitmentId, setEditingFixedCommitmentId] = useState<number | null>(null);
+  const [editingRecoveryBlock, setEditingRecoveryBlock] = useState<RecoveryBlock | null>(null);
   const [quickName, setQuickName] = useState("");
   const [quickHours, setQuickHours] = useState(1);
   const [draftName, setDraftName] = useState("");
@@ -958,12 +967,16 @@ function App() {
   const draftSuggestion = useMemo(() => suggestionFor(draftName), [draftName]);
   const quickSuggestion = useMemo(() => suggestionFor(quickName), [quickName]);
   const normalizedDraftHours = Number.isFinite(draftHours) ? Math.max(0, draftHours) : 0;
-  const projectedMargin = calculation.margin - normalizedDraftHours;
+  const editingTask = editingTaskId === null ? null : tasks.find((task) => task.id === editingTaskId) ?? null;
+  const editableBaseMargin = calculation.margin + (editingTask?.estimatedHours ?? 0);
+  const projectedMargin = editableBaseMargin - normalizedDraftHours;
   const projectedStatus = statusFor(projectedMargin);
   const deadlineIndex = Math.max(0, DAYS.indexOf(draftDeadline));
   const draftDailyHours = normalizedDraftHours / (deadlineIndex + 1);
-  const projectedDailyTask = calculation.dailyTask.map((taskHours, index) => taskHours + (index <= deadlineIndex ? draftDailyHours : 0));
-  const projectedDailyMargins = calculation.dailyMargins.map((margin, index) => margin - (index <= deadlineIndex ? draftDailyHours : 0));
+  const editableBaseDailyTask = calculation.dailyTask.map((taskHours, index) => taskHours - (editingTask?.deadline === DAYS[index] ? editingTask.estimatedHours : 0));
+  const editableBaseDailyMargins = calculation.dailyMargins.map((margin, index) => margin + (editingTask?.deadline === DAYS[index] ? editingTask.estimatedHours : 0));
+  const projectedDailyTask = editableBaseDailyTask.map((taskHours, index) => taskHours + (index <= deadlineIndex ? draftDailyHours : 0));
+  const projectedDailyMargins = editableBaseDailyMargins.map((margin, index) => margin - (index <= deadlineIndex ? draftDailyHours : 0));
   const projectedHighLoad = projectedDailyMargins.map((dailyMargin, index) => dailyMargin < 5 || projectedDailyTask[index] > 6);
   const predictedHighLoadDays = longestConsecutive(projectedHighLoad);
   const lowestDayIndex = projectedDailyMargins.reduce((lowest, margin, index, margins) => margin < margins[lowest] ? index : lowest, 0);
@@ -1009,6 +1022,118 @@ function App() {
     setConfirmBreach(false);
     setShowActions(false);
     changeScreen("mirror");
+  };
+
+  const startTaskEdit = (task: FlexibleTask) => {
+    setActionSheetTarget(null);
+    setEditingTaskId(task.id);
+    setDraftName(task.name);
+    setDraftHours(task.estimatedHours);
+    setDraftDeadline(task.deadline);
+    setDraftEnergy(task.energy ?? "deepFocus");
+    setDraftEstimateTouched(true);
+    setConfirmBreach(false);
+    setShowActions(false);
+    changeScreen("mirror");
+  };
+
+  const cancelTaskEdit = () => {
+    setEditingTaskId(null);
+    setDraftName("");
+    setDraftHours(1);
+    setDraftDeadline("Thu");
+    setDraftEstimateTouched(false);
+    changeScreen("dashboard");
+  };
+
+  const startFixedCommitmentEdit = (commitment: FixedCommitment) => {
+    setActionSheetTarget(null);
+    setEditingFixedCommitmentId(commitment.id);
+    setCommitmentName(commitment.name);
+    setCommitmentDays(commitment.days);
+    setCommitmentStart(commitment.startTime);
+    setCommitmentEnd(commitment.endTime);
+    setShowCommitmentForm(true);
+    changeScreen("onboarding");
+  };
+
+  const startRecoveryBlockEdit = (block: RecoveryBlock) => {
+    setActionSheetTarget(null);
+    setEditingRecoveryBlock(block);
+  };
+
+  const addQuickTask = (values: QuickAddValues) => {
+    const name = values.name.trim();
+    const hours = Math.max(0.5, Number(values.hours) || 0);
+    if (!name || !values.day || hours <= 0) return;
+    const suggested = suggestionFor(name);
+    const suggestion = values.category === "auto" ? suggested : { ...suggested, category: values.category };
+    if (!values.split && calculation.margin - hours < 0) {
+      setDraftName(name);
+      setDraftHours(hours);
+      setDraftDeadline(values.day);
+      setDraftEnergy(values.energy);
+      setDraftEstimateTouched(true);
+      setConfirmBreach(false);
+      setShowActions(false);
+      changeScreen("mirror");
+      window.setTimeout(() => setShowConsequencePreview(true), 0);
+      return;
+    }
+    const makeTask = (taskName: string, deadline: string, taskHours: number): FlexibleTask => ({
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      name: taskName,
+      estimatedHours: taskHours,
+      cognitiveLoad: suggestion.cognitiveLoad,
+      deadline,
+      deferred: false,
+      category: suggestion.category,
+      energy: values.energy,
+    });
+    const taskHours = values.split ? Math.max(0.5, Number((hours / 2).toFixed(1))) : hours;
+    const dayIndex = Math.max(0, DAYS.indexOf(values.day));
+    const newTasks = values.split
+      ? [makeTask(`${name} · part 1`, values.day, taskHours), makeTask(`${name} · part 2`, DAYS[(dayIndex + 1) % DAYS.length], taskHours)]
+      : [makeTask(name, values.day, hours)];
+    setTasks((current) => [...current, ...newTasks]);
+    lastToastTaskIdRef.current = newTasks[0].id;
+    setLastToastTaskId(newTasks[0].id);
+    toast.success(values.split ? `Quick added "${name}" across ${values.day} and ${DAYS[(dayIndex + 1) % DAYS.length]}` : `Quick added "${name}" — ${formatShortHours(hours)} on ${values.day}`);
+  };
+
+  const openActionSheet = (target: ActionSheetTarget) => setActionSheetTarget(target);
+
+  const editActionSheetTarget = () => {
+    if (!actionSheetTarget) return;
+    if (actionSheetTarget.kind === "task") startTaskEdit(actionSheetTarget.item);
+    if (actionSheetTarget.kind === "fixed") startFixedCommitmentEdit(actionSheetTarget.item);
+    if (actionSheetTarget.kind === "recovery") startRecoveryBlockEdit(actionSheetTarget.item);
+  };
+
+  const deleteActionSheetTarget = () => {
+    if (!actionSheetTarget) return;
+    const { kind, item } = actionSheetTarget;
+    if (kind === "task") {
+      deleteTaskSilently(item.id);
+      toast.success(`Deleted "${item.name}"`);
+    } else if (kind === "fixed") {
+      setFixedCommitments((current) => current.filter((commitment) => commitment.id !== item.id));
+      toast.success(`Deleted "${item.name}"`);
+    } else {
+      setRecoveryBlocks((current) => (current.length ? current : DEFAULT_RECOVERY_BLOCKS).filter((block) => block.id !== item.id));
+      toast.success(`Deleted recovery block "${item.type}"`);
+    }
+    setActionSheetTarget(null);
+  };
+
+  const saveRecoveryBlockEdit = (updates: Pick<RecoveryBlock, "day" | "startTime" | "endTime" | "type">) => {
+    if (!editingRecoveryBlock) return;
+    setRecoveryBlocks((current) => {
+      const source = current.length ? current : DEFAULT_RECOVERY_BLOCKS;
+      return source.map((block) => block.id === editingRecoveryBlock.id ? { ...block, ...updates } : block);
+    });
+    setEditingRecoveryBlock(null);
+    toast.success("Recovery block updated");
   };
 
   const previewToastTask = (name: string, hours: number, explicitDeadline?: string) => {
@@ -1059,10 +1184,33 @@ function App() {
     const parsed = parseTaskText(draftName, draftDeadline);
     const name = parsed.name;
     const suggestion = parsed.suggestion;
+    const estimatedHours = Math.max(0.5, Number(hoursOverride ?? parsed.hours ?? draftHours) || suggestion.midpoint);
+    if (editingTaskId !== null) {
+      const updatedTask: FlexibleTask = {
+        id: editingTaskId,
+        name,
+        estimatedHours,
+        cognitiveLoad: suggestion.cognitiveLoad,
+        deadline: parsed.day,
+        deferred: false,
+        category: suggestion.category,
+        energy: draftEnergy,
+      };
+      setTasks((current) => current.map((item) => item.id === editingTaskId ? updatedTask : item));
+      setEditingTaskId(null);
+      setDraftName("");
+      setDraftHours(1);
+      setDraftEstimateTouched(false);
+      setConfirmBreach(false);
+      setShowActions(false);
+      changeScreen("dashboard");
+      toast.success(`Updated "${name}"`);
+      return;
+    }
     const task: FlexibleTask = {
       id: Date.now(),
       name,
-      estimatedHours: Math.max(0.5, Number(hoursOverride ?? parsed.hours ?? draftHours) || suggestion.midpoint),
+      estimatedHours,
       cognitiveLoad: suggestion.cognitiveLoad,
       deadline: parsed.day,
       deferred,
@@ -1163,6 +1311,10 @@ function App() {
       return;
     }
     // confirmBreach means the student already came back through "See impact"; don't re-open the preview.
+    if (editingTaskId !== null) {
+      addTask(false);
+      return;
+    }
     if (!showConsequencePreview && !confirmBreach) {
       setShowConsequencePreview(true);
       return;
@@ -1252,13 +1404,19 @@ function App() {
   };
 
   const commitPendingCommitment = (pending: PendingCommitment) => {
-    setFixedCommitments((current) => [...current, { id: Date.now(), name: pending.name, days: pending.days, startTime: pending.startTime, endTime: pending.endTime, hours: pending.hours }]);
+    if (pending.editingId !== undefined) {
+      setFixedCommitments((current) => current.map((item) => item.id === pending.editingId ? { id: item.id, name: pending.name, days: pending.days, startTime: pending.startTime, endTime: pending.endTime, hours: pending.hours } : item));
+      toast.success(`Updated ${pending.name}`);
+    } else {
+      setFixedCommitments((current) => [...current, { id: Date.now(), name: pending.name, days: pending.days, startTime: pending.startTime, endTime: pending.endTime, hours: pending.hours }]);
+      toast.success(`Added ${pending.name} — you're now at ${pending.capacityAfterPercent}% capacity`);
+    }
+    setEditingFixedCommitmentId(null);
     setCommitmentName("");
     setCommitmentDays([]);
     setShowCommitmentForm(false);
     setPendingCommitment(null);
     setShowCommitmentImpact(false);
-    toast.success(`Added ${pending.name} — you're now at ${pending.capacityAfterPercent}% capacity`);
   };
 
   const deferTaskForPendingCommitment = (task: Pick<FlexibleTask, "id" | "name" | "estimatedHours">) => {
@@ -1280,13 +1438,15 @@ function App() {
     const hoursPerDay = durationBetween(commitmentStart, commitmentEnd);
     if (hoursPerDay <= 0) return;
     const hours = Number((hoursPerDay * commitmentDays.length).toFixed(1));
-    const availableBefore = calculation.margin;
+    const editingCommitment = editingFixedCommitmentId === null ? null : fixedCommitments.find((item) => item.id === editingFixedCommitmentId) ?? null;
+    const availableBefore = calculation.margin + (editingCommitment?.hours ?? 0);
     const availableAfter = Number((availableBefore - hours).toFixed(1));
     const riskDays = commitmentDays.filter((day) => {
       const dayIndex = DAYS.indexOf(day);
-      return dayIndex >= 0 && calculation.dailyMargins[dayIndex] - hoursPerDay < 2;
+      const previousHours = editingCommitment?.days.includes(day) ? (editingCommitment.hours / Math.max(editingCommitment.days.length, 1)) : 0;
+      return dayIndex >= 0 && calculation.dailyMargins[dayIndex] + previousHours - hoursPerDay < 2;
     });
-    const pending = { name: commitmentName.trim(), days: commitmentDays, startTime: commitmentStart, endTime: commitmentEnd, hours, availableBefore, availableAfter, capacityAfterPercent: Math.round((1 - availableAfter / 168) * 100), riskDays } satisfies PendingCommitment;
+    const pending = { name: commitmentName.trim(), days: commitmentDays, startTime: commitmentStart, endTime: commitmentEnd, hours, availableBefore, availableAfter, capacityAfterPercent: Math.round((1 - availableAfter / 168) * 100), riskDays, editingId: editingFixedCommitmentId ?? undefined } satisfies PendingCommitment;
     setPendingCommitment(pending);
     setShowCommitmentImpact(false);
   };
@@ -1405,6 +1565,7 @@ function App() {
             setCommitmentStart={setCommitmentStart}
             setCommitmentEnd={setCommitmentEnd}
             saveCommitment={saveCommitment}
+            onOpenActionSheet={openActionSheet}
                   onStart={() => navTo("dashboard")}
                   onImport={openImport}
                 />
@@ -1420,8 +1581,9 @@ function App() {
                   showEnergyCheckIn={showEnergyCheckIn}
                   showMorningCheckIn={showMorningCheckIn}
                   onMorningCheckInRespond={respondMorningCheckIn}
-                  onAddTask={() => startMirror()}
+                  onAddQuickTask={addQuickTask}
                   onQuickCheck={openQuickCheck}
+                  onOpenActionSheet={openActionSheet}
                   recoveryQualityBlock={recoveryBlocks.find((block) => block.locked) ?? null}
                   recoveryQuality={recoveryQuality}
                   recoveryQualityDismissed={recoveryQualityDismissed}
@@ -1437,7 +1599,6 @@ function App() {
                   onTriage={() => openTriage()}
                   onRebalance={(day) => { setDraftDeadline(day); startMirror(); }}
                   onRecordOutcome={recordTaskOutcome}
-                  onDeleteTaskSilently={deleteTaskSilently}
                   onEnergyRespond={respondEnergyCheckIn}
                   lastToastTaskId={lastToastTaskId}
                   showDeprioritizedBanner={showDeprioritizedBanner}
@@ -1458,6 +1619,7 @@ function App() {
                   sleepHours={sleepHours}
                   energyType={draftEnergy}
                   setEnergyType={setDraftEnergy}
+                  isEditing={editingTaskId !== null}
                   energyRecommendation={recommendBestEnergySlot(draftEnergy, tasks, fixedCommitments, recoveryBlocks)}
                   onAcceptEnergyRecommendation={(day) => { setDraftDeadline(day); addTask(false); }}
                   showActions={showActions}
@@ -1467,6 +1629,7 @@ function App() {
                   setDraftDeadline={setDraftDeadline}
                   setShowActions={setShowActions}
                   onAddAnyway={handleAddAnyway}
+                  onCancelEdit={cancelTaskEdit}
                   onTriage={() => openTriage(projectedMargin)}
                   onSplit={() => { setDraftHours(Math.max(0.5, Math.round(draftHours / 2 * 10) / 10)); setShowActions(false); }}
                   onFindSlot={() => { setDraftDeadline(DAYS[(lowestDayIndex + 2) % 7]); setShowActions(false); }}
@@ -1511,6 +1674,7 @@ function App() {
                   onCancelUnlock={() => setUnlockTarget(null)}
                   onSkip={() => navTo("dashboard")}
                   onShowRecoveryMenu={() => setShowRecoveryMenu(true)}
+                  onOpenActionSheet={openActionSheet}
                 />
               )}
               {screen === "reflection" && (
@@ -1579,6 +1743,8 @@ function App() {
         )}
         {pendingCommitment && <CommitmentCapacityModal pending={pendingCommitment} deferrableTasks={tasks.filter((task) => !task.deferred).sort((a, b) => a.estimatedHours - b.estimatedHours)} showImpact={showCommitmentImpact} onSeeImpact={() => setShowCommitmentImpact((current) => !current)} onDeferTask={deferTaskForPendingCommitment} onAddAnyway={() => commitPendingCommitment(pendingCommitment)} onCancel={() => { setPendingCommitment(null); setShowCommitmentImpact(false); }} />}
         {showRecoveryMenu && <RecoveryMenu onClose={() => setShowRecoveryMenu(false)} />}
+        {actionSheetTarget && <ItemActionSheet target={actionSheetTarget} onEdit={editActionSheetTarget} onDelete={deleteActionSheetTarget} onCancel={() => setActionSheetTarget(null)} />}
+        {editingRecoveryBlock && <RecoveryBlockEditor block={editingRecoveryBlock} onSave={saveRecoveryBlockEdit} onCancel={() => setEditingRecoveryBlock(null)} />}
         {screen === "mirror" && (
           <div className="quick-check-fab-wrap">
             <button className="quick-check-fab" aria-label="Can I afford this? Quick check" onClick={openQuickCheck}>
@@ -1596,7 +1762,6 @@ function App() {
 const NAV_ITEMS: { id: Screen; label: string; icon: ReactNode; sub?: boolean }[] = [
   { id: "dashboard", label: "Today", icon: <Home size={18} /> },
   { id: "onboarding", label: "Recovery Floor Setup", icon: <ShieldCheck size={15} />, sub: true },
-  { id: "mirror", label: "Add Task", icon: <Plus size={18} /> },
   { id: "planner", label: "Recovery Planner", icon: <Moon size={18} /> },
   { id: "reflection", label: "Weekly Reflection", icon: <BarChart3 size={18} /> },
   { id: "import", label: "Import Schedule", icon: <Upload size={18} /> },
@@ -1613,7 +1778,6 @@ const BOTTOM_TAB_ICONS: Record<string, ReactNode> = {
 function BottomTabBar({ active, onNavigate }: { active: Screen; onNavigate: (s: Screen) => void }) {
   const tabs = [
     { screen: "dashboard", label: "Today", icon: "Home" },
-    { screen: "mirror", label: "Add Task", icon: "Plus" },
     { screen: "planner", label: "Planner", icon: "Leaf" },
     { screen: "reflection", label: "Reflect", icon: "BarChart2" },
   ] as const;
@@ -1672,6 +1836,59 @@ function Header({ screen, isDark, onBack, onMenu, onHelp, onTestNotification, on
   );
 }
 
+function QuickAddForm({ onAdd, onClose }: { onAdd: (values: QuickAddValues) => void; onClose: () => void }) {
+  const defaultDay = DAYS[(new Date().getDay() + 6) % DAYS.length];
+  const [name, setName] = useState("");
+  const [day, setDay] = useState(defaultDay);
+  const [hours, setHours] = useState(1);
+  const [category, setCategory] = useState<QuickAddValues["category"]>("auto");
+  const [energy, setEnergy] = useState<EnergyType>("deepFocus");
+  const [split, setSplit] = useState(false);
+  const [showFullOptions, setShowFullOptions] = useState(false);
+  const submit = () => {
+    if (!name.trim() || !Number.isFinite(hours) || hours <= 0) return;
+    onAdd({ name, day, hours, category, energy, split });
+    setName("");
+    setHours(1);
+    setSplit(false);
+    onClose();
+  };
+  return <div className="quick-add-form" aria-label="Quick add task form">
+    <div className="quick-add-form-head"><div><strong>Quick add</strong><span>Three details is enough to get it on your week.</span></div><button type="button" className="icon-button" aria-label="Close quick add" onClick={onClose}><X size={16} /></button></div>
+    <div className="quick-add-fields">
+      <label className="field-label quick-add-name-field">Name<input autoFocus className="text-input" placeholder="e.g. Readings for seminar" value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") submit(); }} /></label>
+      <label className="field-label">Day<select className="text-input" value={day} onChange={(event) => setDay(event.target.value)}>{DAYS.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+      <label className="field-label">Duration<input className="text-input" type="number" min="0.5" step="0.5" value={hours} onChange={(event) => setHours(Number(event.target.value))} /><span className="quick-add-unit">hrs</span></label>
+    </div>
+    <button type="button" className="quick-add-options-link" onClick={() => setShowFullOptions((current) => !current)} aria-expanded={showFullOptions}><span>{showFullOptions ? "Hide full options" : "Full options"}</span><ChevronDown size={14} /></button>
+    {showFullOptions && <div className="quick-add-full-options">
+      <label className="field-label">Task type<select className="text-input" value={category} onChange={(event) => setCategory(event.target.value as QuickAddValues["category"])}><option value="auto">Auto-detect from name</option><option value="mental">Mental</option><option value="physical">Physical</option><option value="social">Social</option><option value="errands">Errands</option></select></label>
+      <label className="field-label">Energy<select className="text-input" value={energy} onChange={(event) => setEnergy(event.target.value as EnergyType)}>{(Object.keys(ENERGY_LABELS) as EnergyType[]).map((type) => <option key={type} value={type}>{ENERGY_LABELS[type]}</option>)}</select></label>
+      <label className="quick-add-checkbox"><input type="checkbox" checked={split} onChange={(event) => setSplit(event.target.checked)} /><span><strong>Split across two days</strong><small>Creates two smaller task blocks starting on the selected day.</small></span></label>
+    </div>}
+    <div className="quick-add-form-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={!name.trim() || !Number.isFinite(hours) || hours <= 0} onClick={submit}><Plus size={16} /> Add task</button></div>
+  </div>;
+}
+
+function ItemActionSheet({ target, onEdit, onDelete, onCancel }: { target: ActionSheetTarget; onEdit: () => void; onDelete: () => void; onCancel: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onCancel(); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
+  const title = target.kind === "task" ? target.item.name : target.kind === "fixed" ? target.item.name : target.item.type;
+  const detail = target.kind === "task" ? `${formatShortHours(target.item.estimatedHours)} · due ${target.item.deadline}` : target.kind === "fixed" ? `${target.item.days.join(" · ")} · ${target.item.startTime}–${target.item.endTime}` : `${target.item.day} · ${target.item.startTime}–${target.item.endTime}`;
+  return <div className="sheet-backdrop action-sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="item-action-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}><div className="action-sheet" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle" /><div className="sheet-head"><div><span className="card-label">Manage item</span><h2 id="item-action-title">{title}</h2><p>{detail}</p></div><button type="button" className="icon-button" aria-label="Close actions" onClick={onCancel}><X size={17} /></button></div><div className="action-sheet-actions"><button type="button" className="secondary-button" onClick={onEdit}><PenLine size={16} /> Edit</button><button type="button" className="primary-button primary-button-danger" onClick={onDelete}><Trash2 size={16} /> Delete</button><button type="button" className="text-button action-sheet-cancel" onClick={onCancel}>Cancel</button></div></div></div>;
+}
+
+function RecoveryBlockEditor({ block, onSave, onCancel }: { block: RecoveryBlock; onSave: (updates: Pick<RecoveryBlock, "day" | "startTime" | "endTime" | "type">) => void; onCancel: () => void }) {
+  const [type, setType] = useState(block.type);
+  const [day, setDay] = useState(DAYS.find((item) => block.day.startsWith(item)) ?? "Mon");
+  const [startTime, setStartTime] = useState(block.startTime);
+  const [endTime, setEndTime] = useState(block.endTime);
+  return <div className="sheet-backdrop action-sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="recovery-edit-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}><div className="action-sheet editor-sheet" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle" /><div className="sheet-head"><div><span className="card-label">Edit recovery block</span><h2 id="recovery-edit-title">{block.type}</h2><p>Keep the block small enough to protect.</p></div><button type="button" className="icon-button" aria-label="Close recovery editor" onClick={onCancel}><X size={17} /></button></div><label className="field-label">Label<input className="text-input" value={type} onChange={(event) => setType(event.target.value)} /></label><label className="field-label">Day<select className="text-input" value={day} onChange={(event) => setDay(event.target.value)}>{DAYS.map((option) => <option key={option} value={option}>{option}</option>)}</select></label><div className="quick-add-fields"><label className="field-label">Start<input className="text-input" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label><label className="field-label">End<input className="text-input" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></label></div><div className="quick-add-form-actions"><button type="button" className="secondary-button" onClick={onCancel}>Cancel</button><button type="button" className="primary-button" onClick={() => onSave({ type: type.trim() || "Recovery block", day, startTime, endTime })}>Save changes</button></div></div></div>;
+}
+
 function Onboarding(props: {
   sleepHours: number;
   decompHours: number;
@@ -1684,6 +1901,7 @@ function Onboarding(props: {
   setDecompHours: (value: number) => void;
   setFixedCommitments: (value: FixedCommitment[]) => void;
   setShowCommitmentForm: (value: boolean) => void;
+  onOpenActionSheet: (target: ActionSheetTarget) => void;
   commitmentName: string;
   commitmentDays: string[];
   commitmentStart: string;
@@ -1736,10 +1954,10 @@ function Onboarding(props: {
             <p className="section-caption">Your non-negotiable schedule</p>
             <div className="commitment-list">
               {fixedCommitments.map((commitment) => (
-                <div key={commitment.id} className="commitment-row">
-                  <div><strong>{commitment.name}</strong><span>{commitment.days.join(" · ")} · {commitment.startTime}–{commitment.endTime}</span></div>
-                  <div className="flex items-center gap-3"><span className="hours-chip">{formatShortHours(commitment.hours)}</span><button className="icon-button" aria-label={`Delete ${commitment.name}`} onClick={() => props.setFixedCommitments(fixedCommitments.filter((item) => item.id !== commitment.id))}><Trash2 size={16} /></button></div>
-                </div>
+                <button key={commitment.id} type="button" className="commitment-row commitment-row-button" aria-label={`Edit or delete ${commitment.name}`} onClick={() => props.onOpenActionSheet({ kind: "fixed", item: commitment })}>
+                  <span><strong>{commitment.name}</strong><span>{commitment.days.join(" · ")} · {commitment.startTime}–{commitment.endTime}</span></span>
+                  <span className="hours-chip">{formatShortHours(commitment.hours)}</span>
+                </button>
               ))}
             </div>
             {props.showCommitmentForm ? (
@@ -1768,14 +1986,12 @@ function BurnoutRiskPanel({ atRiskDays, onRebalance }: { atRiskDays: DayRisk[]; 
 function SurvivalPlanCard({ plan, onMoveTask, onLockBlock, onDismiss }: { plan: WeeklyPlan; onMoveTask: () => void; onLockBlock: () => void; onDismiss: () => void }) {
   return <section className="card survival-plan-card"><div className="section-kicker"><ShieldCheck size={14} /><span>Protect This Week</span></div><div className="survival-plan-row"><div><strong>Hardest day: {plan.hardestDay}</strong><small>{plan.loadDescription}</small></div></div>{plan.taskToMove && <div className="survival-plan-row"><span>Move: “{plan.taskToMove.name}” → Sat</span><button className="secondary-button" onClick={onMoveTask}>Move it</button></div>}{plan.blockToLock && <div className="survival-plan-row"><span>Lock: {plan.blockToLock.day} {plan.blockToLock.type}</span><button className="secondary-button" onClick={onLockBlock}>Lock it</button></div>}<div className="survival-plan-actions"><button className="text-button" onClick={onDismiss}>Got it</button><button className="text-button" onClick={onDismiss}>Remind me Sunday</button></div></section>;
 }
-function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showEnergyCheckIn, showMorningCheckIn, onMorningCheckInRespond, onAddTask, onQuickCheck, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, weeklyPlan, showSurvivalPlan, onMoveWeeklyTask, onLockWeeklyBlock, onDismissSurvivalPlan, onShowWeeklyPlan, onTriage, onRebalance, onRecordOutcome, onDeleteTaskSilently, onEnergyRespond, lastToastTaskId, showDeprioritizedBanner, onDismissDeprioritizedBanner }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; fixedCommitments: FixedCommitment[]; recoveryBlocks: RecoveryBlock[]; showEnergyCheckIn: boolean; showMorningCheckIn: boolean; onMorningCheckInRespond: (value: MoodValue) => void; onAddTask: () => void; onQuickCheck: () => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; weeklyPlan: WeeklyPlan; showSurvivalPlan: boolean; onMoveWeeklyTask: () => void; onLockWeeklyBlock: () => void; onDismissSurvivalPlan: () => void; onShowWeeklyPlan: () => void; onTriage: () => void; onRebalance: (day: string) => void; onRecordOutcome: (task: FlexibleTask, outcome: TaskOutcomeValue) => void; onDeleteTaskSilently: (id: number) => void; onEnergyRespond: (response: EnergyResponse) => void; lastToastTaskId: number | null; showDeprioritizedBanner: boolean; onDismissDeprioritizedBanner: () => void }) {
+function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showEnergyCheckIn, showMorningCheckIn, onMorningCheckInRespond, onAddQuickTask, onQuickCheck, onOpenActionSheet, recoveryQualityBlock, recoveryQualityDismissed, onRecoveryQuality, onPlanner, onReflection, weeklyPlan, showSurvivalPlan, onMoveWeeklyTask, onLockWeeklyBlock, onDismissSurvivalPlan, onShowWeeklyPlan, onTriage, onRebalance, onRecordOutcome, onEnergyRespond, lastToastTaskId, showDeprioritizedBanner, onDismissDeprioritizedBanner }: { calculation: ReturnType<typeof useCalculationShape>; tasks: FlexibleTask[]; fixedCommitments: FixedCommitment[]; recoveryBlocks: RecoveryBlock[]; showEnergyCheckIn: boolean; showMorningCheckIn: boolean; onMorningCheckInRespond: (value: MoodValue) => void; onAddQuickTask: (values: QuickAddValues) => void; onQuickCheck: () => void; onOpenActionSheet: (target: ActionSheetTarget) => void; recoveryQualityBlock: RecoveryBlock | null; recoveryQuality: "Fully" | "Partially" | "Not really" | null; recoveryQualityDismissed: boolean; onRecoveryQuality: (quality: "Fully" | "Partially" | "Not really") => void; onPlanner: () => void; onReflection: () => void; weeklyPlan: WeeklyPlan; showSurvivalPlan: boolean; onMoveWeeklyTask: () => void; onLockWeeklyBlock: () => void; onDismissSurvivalPlan: () => void; onShowWeeklyPlan: () => void; onTriage: () => void; onRebalance: (day: string) => void; onRecordOutcome: (task: FlexibleTask, outcome: TaskOutcomeValue) => void; onEnergyRespond: (response: EnergyResponse) => void; lastToastTaskId: number | null; showDeprioritizedBanner: boolean; onDismissDeprioritizedBanner: () => void }) {
   const [showFullWeek, setShowFullWeek] = useState(false);
   const [dailyView, setDailyView] = useState<"week" | "day">("week");
   const [dailyDate, setDailyDate] = useState(() => new Date());
-  const [pendingOutcomeId, setPendingOutcomeId] = useState<number | null>(null);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [expandedDeadlineIds, setExpandedDeadlineIds] = useState<number[]>([]);
-  const pendingOutcomeIdRef = useRef<number | null>(null);
-  useEffect(() => { pendingOutcomeIdRef.current = pendingOutcomeId; }, [pendingOutcomeId]);
   const [showFabHint, setShowFabHint] = useState(() => typeof window !== "undefined" && !window.localStorage.getItem("marginFabHintSeen"));
   useEffect(() => {
     if (!showFabHint) return;
@@ -1783,15 +1999,6 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     return () => clearTimeout(timer);
   }, [showFabHint]);
   const dismissFabHint = () => { setShowFabHint(false); window.localStorage.setItem("marginFabHintSeen", "1"); };
-  const requestDelete = (id: number) => {
-    setPendingOutcomeId(id);
-    setTimeout(() => {
-      if (pendingOutcomeIdRef.current === id) {
-        onDeleteTaskSilently(id);
-        setPendingOutcomeId(null);
-      }
-    }, 5000);
-  };
   const status = calculation.status;
   const scale = Math.max(calculation.availableCapacity, calculation.flexTotal + Math.max(calculation.margin, 0), 1);
   const lowestDayIndex = calculation.dailyMargins.reduce((lowest, margin, index, margins) => (margin < margins[lowest] ? index : lowest), 0);
@@ -1836,7 +2043,6 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     if (lockInTasks.some(({ task }) => task.id === lastToastTaskId)) onDismissDeprioritizedBanner();
   }, [lastToastTaskId, lockInTasks, onDismissDeprioritizedBanner, showDeprioritizedBanner]);
   const nextBlock = nextRecoveryBlock(recoveryBlocks);
-  const outcomeEmojis: { value: TaskOutcomeValue; icon: string }[] = [{ value: "Easy", icon: "🔥" }, { value: "Fine", icon: "🙂" }, { value: "Hard", icon: "😵" }, { value: "Disaster", icon: "💀" }];
   const renderTaskRow = (task: FlexibleTask, tag?: string, lockIn = false) => {
     const Icon = categoryIcon(task.category);
     const due = lockIn ? dueLabelForTask(task.deadline, today) : null;
@@ -1844,8 +2050,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     const deadlineSentence = pressure ? formatDeadlineSentence(task, pressure) : "";
     const urgencyClass = lockIn ? ` task-row-urgency-${due?.urgency}${pressure && (pressure.unsafeDays.length > 0 || pressure.daysRemaining <= 1) ? " task-row-urgent" : ""}` : "";
     const expanded = expandedDeadlineIds.includes(task.id);
-    if (pendingOutcomeId === task.id) return <div className={`task-row${urgencyClass}${task.id === lastToastTaskId ? " task-row-highlight" : ""}`} key={task.id}><div className="outcome-feedback-row"><span>{task.name} — how did it go?</span><div className="outcome-emoji-group">{outcomeEmojis.map((item) => <button key={item.value} className="outcome-emoji-button" aria-label={item.value} onClick={() => { onRecordOutcome(task, item.value); setPendingOutcomeId(null); }}>{item.icon}</button>)}</div></div></div>;
-    return <div className={`task-row${urgencyClass}${task.id === lastToastTaskId ? " task-row-highlight" : ""}`} key={task.id}><div className="task-leading">{tag && <span className={`lock-in-tag lock-in-tag-${tag.toLowerCase().replace(/[^a-z]/g, "")}`}>{tag}</span>}<div className={`task-icon task-icon-${task.category}`}><Icon size={15} /></div><div><strong>{task.name}</strong><span>{formatHours(task.estimatedHours)} · {categoryLabel(task.category)} load · due {lockIn ? <button className={`deadline-summary deadline-summary-${due?.urgency}`} onClick={() => setExpandedDeadlineIds((current) => current.includes(task.id) ? current.filter((id) => id !== task.id) : [...current, task.id])} aria-expanded={expanded}>{due?.label}</button> : task.deadline}</span>{expanded && <p className="deadline-sentence">{deadlineSentence}</p>}</div></div><button className="icon-button" aria-label={`Delete ${task.name}`} onClick={() => requestDelete(task.id)}><Trash2 size={16} /></button></div>;
+    return <div className={`task-row task-row-interactive${urgencyClass}${task.id === lastToastTaskId ? " task-row-highlight" : ""}`} key={task.id} role="button" tabIndex={0} aria-label={`Edit or delete ${task.name}`} onClick={() => onOpenActionSheet({ kind: "task", item: task })} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpenActionSheet({ kind: "task", item: task }); } }}><div className="task-leading">{tag && <span className={`lock-in-tag lock-in-tag-${tag.toLowerCase().replace(/[^a-z]/g, "")}`}>{tag}</span>}<div className={`task-icon task-icon-${task.category}`}><Icon size={15} /></div><div><strong>{task.name}</strong><span>{formatHours(task.estimatedHours)} · {categoryLabel(task.category)} load · due {lockIn ? <button className={`deadline-summary deadline-summary-${due?.urgency}`} onClick={(event) => { event.stopPropagation(); setExpandedDeadlineIds((current) => current.includes(task.id) ? current.filter((id) => id !== task.id) : [...current, task.id]); }} aria-expanded={expanded}>{due?.label}</button> : task.deadline}</span>{expanded && <p className="deadline-sentence">{deadlineSentence}</p>}</div></div><span className="task-row-action-hint"><PenLine size={14} /> Manage</span></div>;
   };
   const moodPillTone: Record<MoodValue, string> = { Drained: "pill-negative", Okay: "pill-neutral", Good: "pill-neutral", Energized: "pill-positive" };
   const energyPillTone: Record<EnergyResponse, string> = { Rough: "pill-negative", Okay: "pill-neutral", Ready: "pill-positive" };
@@ -1895,7 +2100,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
       {[{ key: "morning", label: "Morning", time: "09:00 – 12:00" }, { key: "afternoon", label: "Afternoon", time: "12:00 – 17:00" }, { key: "evening", label: "Evening", time: "17:00 – 21:00" }].map((slot) => {
         const slotTasks = dailySlotTasks[slot.key as keyof typeof dailySlotTasks];
         const slotCommitments = dailyCommitments.filter((commitment) => commitment.startTime < (slot.key === "morning" ? "12:00" : slot.key === "afternoon" ? "17:00" : "21:00") && commitment.endTime > (slot.key === "morning" ? "09:00" : slot.key === "afternoon" ? "12:00" : "17:00"));
-        return <div className="daily-slot" key={slot.key}><div className="daily-slot-head"><strong>{slot.label}</strong><span>{slot.time}</span></div>{slotCommitments.map((commitment) => <div className="daily-blocked-bar" key={commitment.id}>Blocked · {commitment.name} · {commitment.startTime}–{commitment.endTime}</div>)}{slotTasks.length ? <div className="daily-task-chips">{slotTasks.map((task) => <button className={`daily-task-chip daily-task-chip-${task.category}`} key={task.id} onClick={() => requestDelete(task.id)}>{task.name} · {formatShortHours(task.estimatedHours)}</button>)}</div> : <span className="daily-empty-slot">No tasks — margin available</span>}{slot.key === "evening" && dailyRecoveryBlocks.map((block) => <div className="daily-recovery-bar" key={block.id}>░░ Recovery block · {block.type} · {block.startTime}–{block.endTime}</div>)}</div>;
+        return <div className="daily-slot" key={slot.key}><div className="daily-slot-head"><strong>{slot.label}</strong><span>{slot.time}</span></div>{slotCommitments.map((commitment) => <button type="button" className="daily-blocked-bar daily-blocked-bar-interactive" aria-label={`Edit or delete ${commitment.name}`} key={commitment.id} onClick={() => onOpenActionSheet({ kind: "fixed", item: commitment })}>Blocked · {commitment.name} · {commitment.startTime}–{commitment.endTime}</button>)}{slotTasks.length ? <div className="daily-task-chips">{slotTasks.map((task) => <button className={`daily-task-chip daily-task-chip-${task.category}`} key={task.id} onClick={() => onOpenActionSheet({ kind: "task", item: task })}>{task.name} · {formatShortHours(task.estimatedHours)}</button>)}</div> : <span className="daily-empty-slot">No tasks — margin available</span>}{slot.key === "evening" && dailyRecoveryBlocks.map((block) => <div className="daily-recovery-bar" key={block.id}>░░ Recovery block · {block.type} · {block.startTime}–{block.endTime}</div>)}</div>;
       })}
     </section>}
     <section className="card category-breakdown-card">
@@ -1916,6 +2121,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
       <section className="card tasks-panel lock-in-panel">
         {showDeprioritizedBanner && <div className="lockin-note" role="status"><span>Added — didn't make today's top 2.</span><button className="text-button" onClick={() => setShowFullWeek(true)}>See full list</button><button className="icon-button" aria-label="Dismiss added task notice" onClick={onDismissDeprioritizedBanner}><X size={14} /></button></div>}
         <div className="tasks-head"><div><span className="card-label">Today's Lock In</span><p className="card-subtitle">Things that matter most</p><div className="lock-in-legend"><span><i className="lock-in-legend-dot lock-in-legend-today" />Today</span><span><i className="lock-in-legend-dot lock-in-legend-tomorrow" />Tomorrow</span><span><i className="lock-in-legend-dot lock-in-legend-week" />This week</span></div></div></div>
+        {showQuickAdd ? <QuickAddForm onAdd={onAddQuickTask} onClose={() => setShowQuickAdd(false)} /> : <button type="button" className="quick-add-row" onClick={() => setShowQuickAdd(true)}><Plus size={16} /><span><strong>Quick add</strong><small>Name, day, and duration — keep it light.</small></span><ChevronDown size={15} /></button>}
         <div className="task-list">
           {lockInTasks.length ? lockInTasks.map(({ task, tag }) => renderTaskRow(task, tag, true)) : <div className="empty-state"><FileText size={19} /><span>No lock-in task right now.</span></div>}
           {nextBlock ? <div className="task-row"><div className="task-leading"><span className="lock-in-tag lock-in-tag-recovery">Recovery</span><div className="task-icon task-icon-recovery"><LockKeyhole size={15} /></div><div><strong>{nextBlock.type}</strong><span>{nextBlock.day} · {nextBlock.startTime}–{nextBlock.endTime}</span></div></div></div> : <div className="task-row"><div className="task-leading"><span className="lock-in-tag lock-in-tag-recovery">Recovery</span><div className="task-icon task-icon-recovery"><LockKeyhole size={15} /></div><div><strong>No recovery block locked yet</strong><span>Protect one before the week fills up.</span></div></div><button className="text-action" onClick={onPlanner}>Open planner</button></div>}
@@ -1929,12 +2135,11 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
           { label: "Flex Tasks", value: calculation.flexTotal, good: calculation.flexTotal <= calculation.margin + calculation.flexTotal },
           { label: "Recovery Margin", value: Math.max(calculation.margin, 0), good: calculation.margin >= 5 },
         ].map((item) => <div className="telemetry-card" key={item.label}><span className="telemetry-label">{item.label} {item.good && <CircleCheck size={12} />}</span><strong className="telemetry-value">{formatHours(item.value)}</strong></div>)}</div></section>
-        <section className="card tasks-panel"><div className="tasks-head"><div><span className="card-label">Flexible commitments</span><p className="card-subtitle">These compete for the margin. They can be deferred in Triage.</p></div><span className="task-count">{activeTasks.length} active</span></div>{activeTasks.length ? <div className="task-list">{activeTasks.map((task) => renderTaskRow(task))}</div> : <div className="empty-state"><FileText size={19} /><span>No flexible tasks yet. Add one to see its cost.</span></div>}<button className="text-action" onClick={() => setShowFullWeek(false)}>← Back to Lock In</button></section>
+        <section className="card tasks-panel"><div className="tasks-head"><div><span className="card-label">Flexible commitments</span><p className="card-subtitle">These compete for the margin. They can be deferred in Triage.</p></div><span className="task-count">{activeTasks.length} active</span></div>{showQuickAdd ? <QuickAddForm onAdd={onAddQuickTask} onClose={() => setShowQuickAdd(false)} /> : <button type="button" className="quick-add-row" onClick={() => setShowQuickAdd(true)}><Plus size={16} /><span><strong>Quick add</strong><small>Name, day, and duration — keep it light.</small></span><ChevronDown size={15} /></button>}{activeTasks.length ? <div className="task-list">{activeTasks.map((task) => renderTaskRow(task))}</div> : <div className="empty-state"><FileText size={19} /><span>No flexible tasks yet. Add one to see its cost.</span></div>}<button className="text-action" onClick={() => setShowFullWeek(false)}>← Back to Lock In</button></section>
       </>
     )}
     <div className="dashboard-actions">
       {!showFullWeek ? <button className="secondary-button" onClick={() => setShowFullWeek(true)}>Show Full Week</button> : <button className="secondary-button" onClick={() => setShowFullWeek(false)}>← Back to Lock In</button>}
-      <button className="primary-button" onClick={onAddTask}><Plus size={18} /> Add Task</button>
       <button className="secondary-button" onClick={onPlanner}><Leaf size={17} /> Recovery Planner</button>
     </div>
     <div className="quick-check-fab-wrap">
@@ -1956,9 +2161,9 @@ const calculateWeeklyStressPattern = (moodChecks: MoodCheckIn[], dates: Date[], 
 type CalculationShape = { fixedTotal: number; recoveryBlockTotal: number; tier2Total: number; availableCapacity: number; flexTotal: number; margin: number; dailyMargins: number[]; dailyFixed: number[]; dailyRecoveryBlocks: number[]; dailyTask: number[]; longestRun: number; distributionWarning: boolean; status: ReturnType<typeof statusFor>; categoryBreakdown: { mental: number; physical: number; social: number; errands: number; time: number } };
 type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
 const useCalculationShape = null as unknown as () => CalculationShape;
-type PendingCommitment = { name: string; days: string[]; startTime: string; endTime: string; hours: number; availableBefore: number; availableAfter: number; capacityAfterPercent: number; riskDays: string[] };
+type PendingCommitment = { name: string; days: string[]; startTime: string; endTime: string; hours: number; availableBefore: number; availableAfter: number; capacityAfterPercent: number; riskDays: string[]; editingId?: number };
 
-function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargin, projectedStatus, consequenceDay, dailyBreachAmount, sleepImpact, predictedHighLoadDays, sleepHours, energyType, setEnergyType, energyRecommendation, onAcceptEnergyRecommendation, showActions, confirmBreach, setDraftName, setDraftHours, setDraftDeadline, setShowActions, onAddAnyway, onTriage, onSplit, onFindSlot, onDefer, onChooseOption }: { draftName: string; draftHours: number; draftDeadline: string; projectedMargin: number; projectedStatus: ReturnType<typeof statusFor>; consequenceDay: string; dailyBreachAmount: number; sleepImpact: number; predictedHighLoadDays: number; sleepHours: number; energyType: EnergyType; setEnergyType: (value: EnergyType) => void; energyRecommendation: EnergyRecommendation; onAcceptEnergyRecommendation: (day: string) => void; showActions: boolean; confirmBreach: boolean; setDraftName: (value: string) => void; setDraftHours: (value: number) => void; setDraftDeadline: (value: string) => void; setShowActions: (value: boolean) => void; onAddAnyway: () => void; onTriage: () => void; onSplit: () => void; onFindSlot: () => void; onDefer: () => void; onChooseOption: (option: "addAnyway" | "split" | "defer" | "decline") => void }) {
+function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargin, projectedStatus, consequenceDay, dailyBreachAmount, sleepImpact, predictedHighLoadDays, sleepHours, energyType, setEnergyType, energyRecommendation, onAcceptEnergyRecommendation, showActions, confirmBreach, isEditing, setDraftName, setDraftHours, setDraftDeadline, setShowActions, onAddAnyway, onCancelEdit, onTriage, onSplit, onFindSlot, onDefer, onChooseOption }: { draftName: string; draftHours: number; draftDeadline: string; projectedMargin: number; projectedStatus: ReturnType<typeof statusFor>; consequenceDay: string; dailyBreachAmount: number; sleepImpact: number; predictedHighLoadDays: number; sleepHours: number; energyType: EnergyType; setEnergyType: (value: EnergyType) => void; energyRecommendation: EnergyRecommendation; onAcceptEnergyRecommendation: (day: string) => void; showActions: boolean; confirmBreach: boolean; isEditing: boolean; setDraftName: (value: string) => void; setDraftHours: (value: number) => void; setDraftDeadline: (value: string) => void; setShowActions: (value: boolean) => void; onAddAnyway: () => void; onCancelEdit: () => void; onTriage: () => void; onSplit: () => void; onFindSlot: () => void; onDefer: () => void; onChooseOption: (option: "addAnyway" | "split" | "defer" | "decline") => void }) {
   const [showSimulator, setShowSimulator] = useState(false);
   const [simulationResults, setSimulationResults] = useState<Record<string, { title: string; description: string; margin: number; status: "good" | "okay" | "tight"; sleep: number; recovery: string }>>({});
   useEffect(() => {
@@ -2022,7 +2227,7 @@ function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargi
     {showSimulator && <section className="simulator-container"><h3>What if I say yes to this?</h3><div className="simulator-options">{(["addAnyway", "split", "defer", "decline"] as const).map((option) => { const result = simulationResults[option]; if (!result) return null; return <div key={option} className="simulator-column"><h4>{result.title}</h4><p className="simulator-subtitle">{result.description}</p><div className="simulator-metrics"><div className="simulator-metric"><span className="simulator-metric-label">Margin</span><strong className={`simulator-metric-value ${result.status}`}>{result.margin}%</strong><span className={`simulator-metric-status ${result.status}`}>{result.status === "good" ? "✓ Good" : result.status === "okay" ? "✓ Okay" : "⚠️ Tight"}</span></div><div className="simulator-metric"><span className="simulator-metric-label">Sleep</span><strong className="simulator-metric-value">{sleepHours}h</strong></div><div className="simulator-metric"><span className="simulator-metric-label">Recovery</span><strong className="simulator-metric-value">{result.recovery}</strong></div></div><button type="button" className="btn-choose" onClick={() => onChooseOption(option)}>Choose</button></div>; })}</div></section>}
 
     <section className="card mirror-input-card">
-      <div className="section-kicker"><span>Input</span></div>
+      <div className="mirror-section-heading"><div className="section-kicker"><span>{isEditing ? "Edit task" : "Input"}</span></div>{isEditing && <button type="button" className="text-button mirror-cancel-edit" onClick={onCancelEdit}>Cancel edit</button>}</div>
       <div className="quick-add-grid">{QUICK_ADD_PRESETS.map((preset) => { const Icon = categoryIcon(suggestionFor(preset.name).category); return <button key={preset.name} type="button" className="quick-add-tile" onClick={() => { setDraftName(preset.name); setDraftHours(preset.hours); }}><Icon size={15} /><span><strong>{preset.name}</strong><small>{formatShortHours(preset.hours)} · {preset.displayCategory}</small></span></button>; })}</div>
       <label className="field-label">Other task/commitment?<div className="task-input-group"><input autoFocus className="task-input" placeholder="Type here..." value={draftName} onChange={(event) => setDraftName(event.target.value)} /><button type="button" className={`mic-button${isListening ? " listening" : ""}`} onClick={startSpeechRecognition} title={speechSupported ? "Speak your task" : "Speech not supported"} aria-label="Speak your task" disabled={!speechSupported}>🎤</button></div>{isListening && <div className="listening-indicator">🎙️ Listening...</div>}{!speechSupported && <div className="speech-support-note">Speech not supported on this device</div>}</label>
       <div className="energy-selector"><span className="field-label">Task requires:</span>{(Object.keys(ENERGY_LABELS) as EnergyType[]).map((type) => <label key={type}><input type="radio" name="energy" value={type} checked={energyType === type} onChange={() => setEnergyType(type)} />{ENERGY_LABELS[type]}</label>)}</div>
@@ -2031,7 +2236,7 @@ function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargi
         <label className="field-label">Est time<input className="number-input" type="number" min="0.5" step="0.5" value={draftHours} onChange={(event) => setDraftHours(Number(event.target.value))} /></label>
         <label className="field-label">Day<select className="text-input" value={draftDeadline} onChange={(event) => setDraftDeadline(event.target.value)}>{DAYS.map((day) => <option key={day} value={day}>{day}</option>)}</select></label>
       </div>
-      <button className={`primary-button ${stageTwo ? "primary-button-danger" : ""}`} onClick={onAddAnyway}>{stageTwo && confirmBreach ? "I understand this breaches my recovery floor" : "Add Task"} <ArrowRight size={16} /></button>
+      <button className={`primary-button ${stageTwo && !isEditing ? "primary-button-danger" : ""}`} onClick={onAddAnyway}>{isEditing ? "Save changes" : stageTwo && confirmBreach ? "I understand this breaches my recovery floor" : "Add Task"} <ArrowRight size={16} /></button>
     </section>
 
     <section className="card mirror-easier-card">
@@ -2158,7 +2363,7 @@ function RecoveryMenu({ onClose }: { onClose: () => void }) {
   return <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="recovery-menu-title"><div className="quick-sheet recovery-menu-sheet"><div className="sheet-head"><div><p className="eyebrow">Recovery Menu</p><h2 id="recovery-menu-title">How much time do you have?</h2></div><button className="icon-button" aria-label="Close recovery menu" onClick={onClose}><X size={19} /></button></div><div className="time-selector"><button className={`time-chip ${selectedTime === 10 ? "time-chip-active" : ""}`} onClick={() => setSelectedTime(10)}>10 min</button><button className={`time-chip ${selectedTime === 30 ? "time-chip-active" : ""}`} onClick={() => setSelectedTime(30)}>30 min</button><button className={`time-chip ${selectedTime === 120 ? "time-chip-active" : ""}`} onClick={() => setSelectedTime(120)}>2 hours</button></div>{selectedTime && <div className="recovery-options-list">{RECOVERY_MENU[selectedTime].map((option) => <div key={option.name} className="recovery-option-row"><strong>{option.name}</strong><small>{option.detail}</small></div>)}</div>}<button className="secondary-button" onClick={onClose}>Close</button></div></div>;
 }
 
-function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtect, onLockAll, onUnlock, onUnlockAll, unlockTarget, onConfirmUnlock, onCancelUnlock, onSkip, onShowRecoveryMenu }: { loadPattern: { label: string; recommendation: string; category: TaskCategory }; recoveryBlocks: RecoveryBlock[]; plannerMessage: string; onProtect: (id: number) => void; onLockAll: () => void; onUnlock: (id: number) => void; onUnlockAll: () => void; unlockTarget: number | "all" | null; onConfirmUnlock: () => void; onCancelUnlock: () => void; onSkip: () => void; onShowRecoveryMenu: () => void }) {
+function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtect, onLockAll, onUnlock, onUnlockAll, unlockTarget, onConfirmUnlock, onCancelUnlock, onSkip, onShowRecoveryMenu, onOpenActionSheet }: { loadPattern: { label: string; recommendation: string; category: TaskCategory }; recoveryBlocks: RecoveryBlock[]; plannerMessage: string; onProtect: (id: number) => void; onLockAll: () => void; onUnlock: (id: number) => void; onUnlockAll: () => void; unlockTarget: number | "all" | null; onConfirmUnlock: () => void; onCancelUnlock: () => void; onSkip: () => void; onShowRecoveryMenu: () => void; onOpenActionSheet: (target: ActionSheetTarget) => void }) {
   const blocks = recoveryBlocks.length ? recoveryBlocks : [
     { id: 101, day: "Tuesday", startTime: "18:00", endTime: "19:00", type: loadPattern.category === "mental" ? "Physical break" : "Low-stimulus reset", locked: false },
     { id: 102, day: "Thursday", startTime: "18:30", endTime: "19:30", type: loadPattern.category === "social" ? "Solo time" : "Screen-free wind-down", locked: false },
@@ -2173,11 +2378,11 @@ function RecoveryPlanner({ loadPattern, recoveryBlocks, plannerMessage, onProtec
     <section className="card planner-blocks-card">
       <span className="card-label">Scheduled before your remaining tasks, obligations fill what's left</span>
       <div className="planner-block-list">
-        {blocks.map((block) => <div className={`planner-block-row ${block.locked ? "planner-block-locked" : ""}`} key={block.id}>
+        {blocks.map((block) => <div className={`planner-block-row planner-block-interactive ${block.locked ? "planner-block-locked" : ""}`} key={block.id} role="button" tabIndex={0} aria-label={`Edit or delete ${block.type}`} onClick={() => onOpenActionSheet({ kind: "recovery", item: block })} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " " ) { event.preventDefault(); onOpenActionSheet({ kind: "recovery", item: block }); } }}>
           <div className="planner-block-top"><span className="planner-day-pill">{block.day}</span><span className="planner-time">{block.startTime} – {block.endTime}</span></div>
           <strong>{block.type}</strong>
           <small>After 2 consecutive high-load days</small>
-          <div className="planner-block-actions">{block.locked ? <><span className="locked-copy"><ShieldCheck size={15} /> Protected</span><button className="secondary-button planner-action-btn planner-unlock-button" onClick={() => onUnlock(block.id)}>Unlock</button></> : <><button className="secondary-button planner-action-btn" onClick={() => onProtect(block.id)}>Protect</button><button className="text-button planner-action-btn">Edit</button></>}</div>
+          <div className="planner-block-actions">{block.locked ? <><span className="locked-copy"><ShieldCheck size={15} /> Protected</span><button className="secondary-button planner-action-btn planner-unlock-button" onClick={(event) => { event.stopPropagation(); onUnlock(block.id); }}>Unlock</button></> : <><button className="secondary-button planner-action-btn" onClick={(event) => { event.stopPropagation(); onProtect(block.id); }}>Protect</button></>}</div>
         </div>)}
       </div>
     </section>
