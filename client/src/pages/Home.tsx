@@ -47,6 +47,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { useTheme } from "../contexts/ThemeContext";
 import { StressPatternChart } from "../components/StressPatternChart";
+import { ConfirmAddCommitmentModal } from "../components/ConfirmAddCommitmentModal";
 
 type Screen = "onboarding" | "dashboard" | "mirror" | "triage" | "planner" | "reflection" | "import" | "settings" | "guide" | "outcomes-summary";
 type CognitiveLoad = "Low" | "Medium" | "High";
@@ -2037,8 +2038,8 @@ function ConsequencePreview({ projectedMargin, consequenceDay, deferCandidate, o
   return <div className="sheet-backdrop consequence-backdrop" role="dialog" aria-modal="true" aria-labelledby="consequence-preview-title"><div className="consequence-modal"><div className="modal-kicker"><TriangleAlert size={17} /> Consequence Preview</div><h2 id="consequence-preview-title">Not this week.</h2><p className="modal-lede">This breaches your recovery floor on <strong>{consequenceDay}</strong>. I can help next week after {consequenceDay}.</p><div className="modal-actions"><button className="primary-button" onClick={onDeferToNextWeek}>Defer to next week</button><button className="text-button" onClick={onAddAnywayOverride}>Add anyway</button></div></div></div>;
 }
 
-function CommitmentCapacityModal({ pending, showImpact, onSeeImpact, onAddAnyway, onCancel }: { pending: PendingCommitment; showImpact: boolean; onSeeImpact: () => void; onAddAnyway: () => void; onCancel: () => void }) {
-  return <div className="sheet-backdrop consequence-backdrop" role="dialog" aria-modal="true" aria-labelledby="commitment-capacity-title"><div className="consequence-modal commitment-capacity-modal"><div className="modal-kicker"><TriangleAlert size={17} /> Capacity check</div><h2 id="commitment-capacity-title">⚠️ This commitment exceeds your available capacity</h2><div className="capacity-breakdown"><div><span>Current available</span><strong>{formatHours(pending.availableBefore)} hrs</strong></div><div><span>This task</span><strong>{formatHours(pending.hours)} hrs</strong></div><div><span>After adding</span><strong>{pending.capacityAfterPercent}% of your week</strong></div></div>{showImpact && <div className="commitment-impact"><strong>Days at risk</strong><p>{pending.riskDays.length ? pending.riskDays.join(", ") : "No single day falls below the recovery buffer, but weekly capacity is exceeded."}.</p><strong>Rebalance suggestion</strong><p>Reschedule one of the selected days or shorten this commitment before adding it.</p></div>}<div className="modal-actions"><button className="primary-button" onClick={onSeeImpact}>See Impact</button><button className="secondary-button" onClick={onAddAnyway}>Add Anyway</button><button className="text-button" onClick={onCancel}>Cancel</button></div></div></div>;
+function CommitmentCapacityModal({ pending, onAddAnyway, onCancel }: { pending: PendingCommitment; showImpact: boolean; onSeeImpact: () => void; onAddAnyway: () => void; onCancel: () => void }) {
+  return <ConfirmAddCommitmentModal taskName={pending.name} taskDuration={pending.hours} currentAvailable={pending.availableBefore} recoveryFloor={0} fixedCommitments={168 - pending.availableBefore} totalCommitted={168 - pending.availableBefore} onConfirm={onAddAnyway} onCancel={onCancel} />;
 }
 
 function RecoveryQualityCard({ block, onSelect }: { block: RecoveryBlock; onSelect: (quality: "Fully" | "Partially" | "Not really") => void }) {
