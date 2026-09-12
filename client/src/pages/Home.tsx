@@ -1562,6 +1562,7 @@ function App() {
             onAddIt={addItFromPreview}
             onAddAndDefer={addAndDeferFromPreview}
             onSeeOptions={openConsequenceImpact}
+            onClose={() => setShowConsequencePreview(false)}
             onDeferToNextWeek={rescheduleFromPreview}
             onAddAnywayOverride={addAnywayOverrideFromPreview}
           />
@@ -2028,14 +2029,20 @@ function CommitmentMirror({ draftName, draftHours, draftDeadline, projectedMargi
   </div>;
 }
 
-function ConsequencePreview({ projectedMargin, consequenceDay, deferCandidate, onAddIt, onAddAndDefer, onSeeOptions, onDeferToNextWeek, onAddAnywayOverride }: { projectedMargin: number; consequenceDay: string; deferCandidate: FlexibleTask | null; onAddIt: () => void; onAddAndDefer: () => void; onSeeOptions: () => void; onDeferToNextWeek: () => void; onAddAnywayOverride: () => void }) {
+function ConsequencePreview({ projectedMargin, consequenceDay, deferCandidate, onAddIt, onAddAndDefer, onSeeOptions, onDeferToNextWeek, onAddAnywayOverride, onClose }: { projectedMargin: number; consequenceDay: string; deferCandidate: FlexibleTask | null; onAddIt: () => void; onAddAndDefer: () => void; onSeeOptions: () => void; onDeferToNextWeek: () => void; onAddAnywayOverride: () => void; onClose: () => void }) {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+  const shell = (content: ReactNode) => <div className="sheet-backdrop consequence-backdrop" role="dialog" aria-modal="true" aria-labelledby="consequence-preview-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className="consequence-modal" onMouseDown={(event) => event.stopPropagation()}>{content}</div></div>;
   if (projectedMargin >= 10) {
-    return <div className="sheet-backdrop consequence-backdrop" role="dialog" aria-modal="true" aria-labelledby="consequence-preview-title"><div className="consequence-modal"><div className="modal-kicker"><ShieldCheck size={17} /> Consequence Preview</div><h2 id="consequence-preview-title">This fits safely.</h2><p className="modal-lede">Your margin holds at <strong>{formatHours(projectedMargin)}</strong>. You're protected.</p><div className="modal-actions"><button className="primary-button" onClick={onAddIt}>Add it</button></div></div></div>;
+    return shell(<><div className="modal-kicker"><ShieldCheck size={17} /> Consequence Preview</div><h2 id="consequence-preview-title">This fits safely.</h2><p className="modal-lede">Your margin holds at <strong>{formatHours(projectedMargin)}</strong>. You're protected.</p><div className="modal-actions"><button className="primary-button" onClick={onAddIt}>Add it</button><button className="text-button" onClick={onClose}>Cancel</button></div></>);
   }
   if (projectedMargin >= 0) {
-    return <div className="sheet-backdrop consequence-backdrop" role="dialog" aria-modal="true" aria-labelledby="consequence-preview-title"><div className="consequence-modal"><div className="modal-kicker"><TriangleAlert size={17} /> Consequence Preview</div><h2 id="consequence-preview-title">This fits, but something should move.</h2><p className="modal-lede">Adding this tightens your margin to <strong>{formatHours(projectedMargin)}</strong>. {deferCandidate ? <>{deferCandidate.name} on {deferCandidate.deadline} is the best candidate to defer.</> : null}</p><div className="modal-actions"><button className="primary-button" onClick={onAddAndDefer}>Add it{deferCandidate ? ` + defer ${deferCandidate.name}` : ""}</button><button className="secondary-button" onClick={onSeeOptions}>See options</button></div></div></div>;
+    return shell(<><div className="modal-kicker"><TriangleAlert size={17} /> Consequence Preview</div><h2 id="consequence-preview-title">This fits, but something should move.</h2><p className="modal-lede">Adding this tightens your margin to <strong>{formatHours(projectedMargin)}</strong>. {deferCandidate ? <>{deferCandidate.name} on {deferCandidate.deadline} is the best candidate to defer.</> : null}</p><div className="modal-actions"><button className="primary-button" onClick={onAddAndDefer}>Add it{deferCandidate ? ` + defer ${deferCandidate.name}` : ""}</button><button className="secondary-button" onClick={onSeeOptions}>See options</button><button className="text-button" onClick={onClose}>Cancel</button></div></>);
   }
-  return <div className="sheet-backdrop consequence-backdrop" role="dialog" aria-modal="true" aria-labelledby="consequence-preview-title"><div className="consequence-modal"><div className="modal-kicker"><TriangleAlert size={17} /> Consequence Preview</div><h2 id="consequence-preview-title">Not this week.</h2><p className="modal-lede">This breaches your recovery floor on <strong>{consequenceDay}</strong>. I can help next week after {consequenceDay}.</p><div className="modal-actions"><button className="primary-button" onClick={onDeferToNextWeek}>Defer to next week</button><button className="text-button" onClick={onAddAnywayOverride}>Add anyway</button></div></div></div>;
+  return shell(<><div className="modal-kicker"><TriangleAlert size={17} /> Consequence Preview</div><h2 id="consequence-preview-title">Not this week.</h2><p className="modal-lede">This breaches your recovery floor on <strong>{consequenceDay}</strong>. I can help next week after {consequenceDay}.</p><div className="modal-actions"><button className="primary-button" onClick={onDeferToNextWeek}>Defer to next week</button><button className="text-button" onClick={onAddAnywayOverride}>Add anyway</button><button className="text-button" onClick={onClose}>Cancel</button></div></>);
 }
 
 function CommitmentCapacityModal({ pending, onAddAnyway, onCancel }: { pending: PendingCommitment; showImpact: boolean; onSeeImpact: () => void; onAddAnyway: () => void; onCancel: () => void }) {
