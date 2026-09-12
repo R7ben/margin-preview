@@ -740,9 +740,15 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .confirm-commitment-ring strong { top: 72px; font-size: 32px; }
 .confirm-commitment-ring span { top: 112px; font-size: 13px; color: #666; }
 .confirm-commitment-message { margin: 10px 0 16px; text-align: center; font-weight: 700; }
-.confirm-commitment-message-good { color: #168f89; }.confirm-commitment-message-tight { color: #9a7b00; }.confirm-commitment-message-overload { color: #c6382d; }
+.confirm-commitment-message-good { color: #168f89; }.confirm-commitment-message-tight { color: #9a7b00; }.confirm-commitment-message-overload { color: #c6382d; }.confirm-commitment-message-blocked { color: #a52b20; }
 .confirm-commitment-breakdown { display: grid; gap: 7px; margin-bottom: 18px; font-size: 13px; }.confirm-commitment-breakdown div { display: flex; justify-content: space-between; gap: 12px; }.confirm-commitment-breakdown strong { font-family: var(--font-mono); }
 .confirm-commitment-warning { padding: 9px; color: #a52b20; background: #fde9e6; font-size: 12px; }
+.confirm-commitment-deferrals { display: grid; gap: 6px; margin: 10px 0 4px; }
+.confirm-commitment-deferrals-label { color: var(--text-secondary); font-size: 11px; font-weight: 700; }
+.confirm-commitment-defer { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 38px; padding: 8px 10px; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); font-size: 12px; text-align: left; }
+.confirm-commitment-defer:hover { border-color: var(--teal); background: var(--pill-teal-bg); }
+.confirm-commitment-defer strong { color: var(--text-secondary); font-family: var(--font-mono); font-size: 11px; }
+.confirm-commitment-deferred-count { margin: 8px 0 0; color: #168f89; font-size: 12px; font-weight: 700; text-align: center; }
 .confirm-commitment-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }.confirm-commitment-actions button { min-height: 48px; border-radius: 8px; font-size: 16px; font-weight: 700; }.confirm-commitment-cancel { color: #0e5449; background: #dcf1ec; }.confirm-commitment-confirm { color: #fff; background: #0b2e2b; }
 @keyframes modalIn { from { opacity: 0; transform: translateY(9px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes consequenceBackdropIn { from { opacity: 0; } to { opacity: 1; } }

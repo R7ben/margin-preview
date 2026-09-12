@@ -8,8 +8,10 @@ export type ConfirmAddCommitmentModalProps = {
   recoveryFloor: number;
   fixedCommitments: number;
   totalCommitted: number;
+  deferrableTasks?: Array<{ id: number; name: string; estimatedHours: number }>;
   onConfirm: () => void;
   onCancel: () => void;
+  onDeferTask?: (task: { id: number; name: string; estimatedHours: number }) => void;
 };
 
 /** Shows commitment impact before the parent saves the commitment. */
@@ -18,12 +20,15 @@ export const ConfirmAddCommitmentModal = ({
   taskDuration,
   currentAvailable,
   totalCommitted,
+  deferrableTasks = [],
   onConfirm,
   onCancel,
+  onDeferTask,
 }: ConfirmAddCommitmentModalProps) => {
   const cancelRef = useRef<HTMLButtonElement>(null);
   const [visible, setVisible] = useState(false);
   const [ringProgress, setRingProgress] = useState(0);
+  const [deferredCount, setDeferredCount] = useState(0);
   const hoursRemaining = currentAvailable - taskDuration;
   const percentAfter = ((totalCommitted + taskDuration) / 168) * 100;
   const displayPercent = `${Math.round(percentAfter)}%`;
@@ -31,12 +36,6 @@ export const ConfirmAddCommitmentModal = ({
   const isOverload = percentAfter > 90;
   const isTight = !isOverload && percentAfter > 70;
   const tone = isOverload ? "overload" : isTight ? "tight" : "good";
-  const message = isOverload
-    ? `You'll be at ${displayPercent} capacity — this is overload.`
-    : isTight
-      ? `You'll be at ${displayPercent} capacity — tight, but doable.`
-      : `You'll be at ${displayPercent} capacity — you're good.`;
-
   useEffect(() => {
     setVisible(true);
     const animationFrame = window.requestAnimationFrame(() => setRingProgress(boundedPercent));
@@ -59,6 +58,19 @@ export const ConfirmAddCommitmentModal = ({
   const invalid = taskDuration <= 0;
   const tooLong = taskDuration > 168;
   const noCapacity = currentAvailable <= 0;
+  const blocked = tooLong || invalid || hoursRemaining <= 0;
+  const message = blocked
+    ? "Reschedule or defer a task below to make room."
+    : isOverload
+      ? "This is tight. Consider rescheduling other tasks."
+      : isTight
+        ? "Tight, but doable."
+        : "You're good.";
+
+  const deferTask = (task: { id: number; name: string; estimatedHours: number }) => {
+    onDeferTask?.(task);
+    setDeferredCount((count) => count + 1);
+  };
 
   return (
     <div className={`confirm-commitment-backdrop${visible ? " confirm-commitment-visible" : ""}`} role="dialog" aria-modal="true" aria-labelledby="confirm-commitment-title" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
@@ -72,16 +84,18 @@ export const ConfirmAddCommitmentModal = ({
           </svg>
           <strong>{displayPercent}</strong><span>capacity</span>
         </div>
-        <p className={`confirm-commitment-message confirm-commitment-message-${tone}`}>{message}</p>
+        <p className={`confirm-commitment-message confirm-commitment-message-${blocked ? "blocked" : tone}`}>{message}</p>
         <div className="confirm-commitment-breakdown">
           <div><span>Current available</span><strong>{currentAvailable.toFixed(1)} hrs</strong></div>
           <div><span>This task</span><strong>{taskDuration.toFixed(1)} hrs</strong></div>
           <div><span>After adding</span><strong>{displayPercent} of your week</strong></div>
         </div>
-        {(tooLong || invalid || noCapacity) && <p className="confirm-commitment-warning">{tooLong ? "This task is longer than a week." : invalid ? "Task duration must be greater than zero." : "No capacity left this week — defer or reschedule another task."}</p>}
+        {blocked && <p className="confirm-commitment-warning">This won't fit. Reschedule or defer a lower-priority task to make room:</p>}
+        {blocked && deferrableTasks.length > 0 && <div className="confirm-commitment-deferrals"><span className="confirm-commitment-deferrals-label">Deferrable tasks (shortest first)</span>{deferrableTasks.map((task) => <button key={task.id} type="button" className="confirm-commitment-defer" onClick={() => deferTask(task)}><span>{task.name}</span><strong>{task.estimatedHours.toFixed(1)} hrs</strong></button>)}</div>}
+        {deferredCount > 0 && <p className="confirm-commitment-deferred-count">You've deferred {deferredCount} task{deferredCount === 1 ? "" : "s"} to make room.</p>}
         <div className="confirm-commitment-actions">
           <button ref={cancelRef} type="button" className="confirm-commitment-cancel" onClick={close}>Cancel</button>
-          <button type="button" className="confirm-commitment-confirm" onClick={onConfirm} disabled={tooLong || invalid}>Yes, Add It</button>
+          <button type="button" className="confirm-commitment-confirm" onClick={onConfirm} disabled={blocked}>Yes, Add It</button>
         </div>
       </div>
     </div>

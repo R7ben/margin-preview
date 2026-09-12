@@ -1261,12 +1261,26 @@ function App() {
     toast.success(`Added ${pending.name} — you're now at ${pending.capacityAfterPercent}% capacity`);
   };
 
+  const deferTaskForPendingCommitment = (task: Pick<FlexibleTask, "id" | "name" | "estimatedHours">) => {
+    setTasks((current) => current.map((item) => item.id === task.id ? { ...item, deferred: true } : item));
+    const nextAvailableBefore = Number((pendingCommitment ? pendingCommitment.availableBefore + task.estimatedHours : calculation.margin + task.estimatedHours).toFixed(1));
+    const nextAvailableAfter = Number((nextAvailableBefore - (pendingCommitment?.hours ?? 0)).toFixed(1));
+    const nextCapacityPercent = Math.round((1 - nextAvailableAfter / 168) * 100);
+    setPendingCommitment((current) => {
+      if (!current) return current;
+      const availableBefore = Number((current.availableBefore + task.estimatedHours).toFixed(1));
+      const availableAfter = Number((availableBefore - current.hours).toFixed(1));
+      return { ...current, availableBefore, availableAfter, capacityAfterPercent: Math.round((1 - availableAfter / 168) * 100) };
+    });
+    toast.success(`Deferred ${task.name} — you're now at ${nextCapacityPercent}% capacity.`);
+  };
+
   const saveCommitment = () => {
     if (!commitmentName.trim() || !commitmentDays.length) return;
     const hoursPerDay = durationBetween(commitmentStart, commitmentEnd);
     if (hoursPerDay <= 0) return;
     const hours = Number((hoursPerDay * commitmentDays.length).toFixed(1));
-    const availableBefore = calculation.availableCapacity;
+    const availableBefore = calculation.margin;
     const availableAfter = Number((availableBefore - hours).toFixed(1));
     const riskDays = commitmentDays.filter((day) => {
       const dayIndex = DAYS.indexOf(day);
@@ -1563,7 +1577,7 @@ function App() {
             onAddAnywayOverride={addAnywayOverrideFromPreview}
           />
         )}
-        {pendingCommitment && <CommitmentCapacityModal pending={pendingCommitment} showImpact={showCommitmentImpact} onSeeImpact={() => setShowCommitmentImpact((current) => !current)} onAddAnyway={() => commitPendingCommitment(pendingCommitment)} onCancel={() => { setPendingCommitment(null); setShowCommitmentImpact(false); }} />}
+        {pendingCommitment && <CommitmentCapacityModal pending={pendingCommitment} deferrableTasks={tasks.filter((task) => !task.deferred).sort((a, b) => a.estimatedHours - b.estimatedHours)} showImpact={showCommitmentImpact} onSeeImpact={() => setShowCommitmentImpact((current) => !current)} onDeferTask={deferTaskForPendingCommitment} onAddAnyway={() => commitPendingCommitment(pendingCommitment)} onCancel={() => { setPendingCommitment(null); setShowCommitmentImpact(false); }} />}
         {showRecoveryMenu && <RecoveryMenu onClose={() => setShowRecoveryMenu(false)} />}
         {screen === "mirror" && (
           <div className="quick-check-fab-wrap">
@@ -2041,8 +2055,8 @@ function ConsequencePreview({ projectedMargin, consequenceDay, deferCandidate, o
   return shell(<><div className="modal-kicker"><TriangleAlert size={17} /> Consequence Preview</div><h2 id="consequence-preview-title">Not this week.</h2><p className="modal-lede">This breaches your recovery floor on <strong>{consequenceDay}</strong>. I can help next week after {consequenceDay}.</p><div className="modal-actions"><button className="primary-button" onClick={onDeferToNextWeek}>Defer to next week</button><button className="text-button" onClick={onAddAnywayOverride}>Add anyway</button><button className="text-button" onClick={onClose}>Cancel</button></div></>);
 }
 
-function CommitmentCapacityModal({ pending, onAddAnyway, onCancel }: { pending: PendingCommitment; showImpact: boolean; onSeeImpact: () => void; onAddAnyway: () => void; onCancel: () => void }) {
-  return <ConfirmAddCommitmentModal taskName={pending.name} taskDuration={pending.hours} currentAvailable={pending.availableBefore} recoveryFloor={0} fixedCommitments={168 - pending.availableBefore} totalCommitted={168 - pending.availableBefore} onConfirm={onAddAnyway} onCancel={onCancel} />;
+function CommitmentCapacityModal({ pending, deferrableTasks, onDeferTask, onAddAnyway, onCancel }: { pending: PendingCommitment; deferrableTasks: FlexibleTask[]; showImpact: boolean; onSeeImpact: () => void; onDeferTask: (task: Pick<FlexibleTask, "id" | "name" | "estimatedHours">) => void; onAddAnyway: () => void; onCancel: () => void }) {
+  return <ConfirmAddCommitmentModal taskName={pending.name} taskDuration={pending.hours} currentAvailable={pending.availableBefore} recoveryFloor={0} fixedCommitments={168 - pending.availableBefore} totalCommitted={168 - pending.availableBefore} deferrableTasks={deferrableTasks} onDeferTask={onDeferTask} onConfirm={onAddAnyway} onCancel={onCancel} />;
 }
 
 function RecoveryQualityCard({ block, onSelect }: { block: RecoveryBlock; onSelect: (quality: "Fully" | "Partially" | "Not really") => void }) {
