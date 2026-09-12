@@ -739,6 +739,9 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .confirm-commitment-ring strong, .confirm-commitment-ring span { position: absolute; left: 0; width: 100%; text-align: center; }
 .confirm-commitment-ring strong { top: 72px; font-size: 32px; }
 .confirm-commitment-ring span { top: 112px; font-size: 13px; color: #666; }
+.confirm-commitment-nudge { margin: 10px 0 16px; font-size: 14px; font-style: italic; line-height: 1.45; text-align: center; animation: confirmCommitmentNudgeIn 300ms ease-in-out both; }
+.confirm-commitment-nudge-tight { color: #9a7b00; }
+.confirm-commitment-nudge-overload { color: #c6382d; }
 .confirm-commitment-message { margin: 10px 0 16px; text-align: center; font-weight: 700; }
 .confirm-commitment-message-good { color: #168f89; }.confirm-commitment-message-tight { color: #9a7b00; }.confirm-commitment-message-overload { color: #c6382d; }.confirm-commitment-message-blocked { color: #a52b20; }
 .confirm-commitment-breakdown { display: grid; gap: 7px; margin-bottom: 18px; font-size: 13px; }.confirm-commitment-breakdown div { display: flex; justify-content: space-between; gap: 12px; }.confirm-commitment-breakdown strong { font-family: var(--font-mono); }
@@ -753,6 +756,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 @keyframes modalIn { from { opacity: 0; transform: translateY(9px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes consequenceBackdropIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes consequenceModalIn { from { opacity: 0; transform: translate(-50%, -50%) scale(.95); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@keyframes confirmCommitmentNudgeIn { from { opacity: 0; } to { opacity: 1; } }
 .consequence-modal h2 { margin: 17px 0 11px; color: var(--text-primary); font-size: 27px; line-height: 1.1; letter-spacing: -.04em; }
 .modal-lede { margin: 0; color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
 .modal-lede strong { color: #D14F3E; }

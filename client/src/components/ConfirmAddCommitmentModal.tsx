@@ -59,6 +59,11 @@ export const ConfirmAddCommitmentModal = ({
   const tooLong = taskDuration > 168;
   const noCapacity = currentAvailable <= 0;
   const blocked = tooLong || invalid || hoursRemaining <= 0;
+  const recoveryNudge = percentAfter > 90
+    ? "You're overloaded. This won't work without rescheduling other tasks. (See deferrables below)"
+    : percentAfter >= 80
+      ? "You're running tight this week. Consider rescheduling lower-priority work to protect your recovery time."
+      : null;
   const message = blocked
     ? "Reschedule or defer a task below to make room."
     : isOverload
@@ -84,6 +89,7 @@ export const ConfirmAddCommitmentModal = ({
           </svg>
           <strong>{displayPercent}</strong><span>capacity</span>
         </div>
+        {recoveryNudge && <p className={`confirm-commitment-nudge confirm-commitment-nudge-${percentAfter > 90 ? "overload" : "tight"}`}>{recoveryNudge}</p>}
         <p className={`confirm-commitment-message confirm-commitment-message-${blocked ? "blocked" : tone}`}>{message}</p>
         <div className="confirm-commitment-breakdown">
           <div><span>Current available</span><strong>{currentAvailable.toFixed(1)} hrs</strong></div>
