@@ -2006,6 +2006,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     date.setHours(0, 0, 0, 0);
     return date;
   });
+  const [expandedLockInClusters, setExpandedLockInClusters] = useState<Record<string, boolean>>({});
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [expandedDeadlineIds, setExpandedDeadlineIds] = useState<number[]>([]);
   const [showFabHint, setShowFabHint] = useState(() => typeof window !== "undefined" && !window.localStorage.getItem("marginFabHintSeen"));
@@ -2054,6 +2055,12 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     const bUrgency = taskUrgency(b.task.deadline, today);
     return urgencyRank[aUrgency.tier] - urgencyRank[bUrgency.tier] || a.task.estimatedHours - b.task.estimatedHours;
   });
+  const lockInBuckets = Array.from(lockInTasks.reduce((buckets, item) => {
+    const bucket = buckets.get(item.tag) ?? [];
+    bucket.push(item);
+    buckets.set(item.tag, bucket);
+    return buckets;
+  }, new Map<string, { task: FlexibleTask; tag: string }[]>()));
   useEffect(() => {
     if (!showDeprioritizedBanner || lastToastTaskId === null) return;
     if (lockInTasks.some(({ task }) => task.id === lastToastTaskId)) onDismissDeprioritizedBanner();
@@ -2139,7 +2146,18 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
         <div className="tasks-head"><div><span className="card-label">Today's Lock In</span><p className="card-subtitle">Things that matter most</p><div className="lock-in-legend"><span><i className="lock-in-legend-dot lock-in-legend-today" />Today</span><span><i className="lock-in-legend-dot lock-in-legend-tomorrow" />Tomorrow</span><span><i className="lock-in-legend-dot lock-in-legend-week" />This week</span></div></div></div>
         {showQuickAdd ? <QuickAddForm onAdd={onAddQuickTask} onClose={() => setShowQuickAdd(false)} /> : <button type="button" className="quick-add-row" onClick={() => setShowQuickAdd(true)}><Plus size={16} /><span><strong>Quick add</strong><small>Name, day, and duration — keep it light.</small></span><ChevronDown size={15} /></button>}
         <div className="task-list">
-          {lockInTasks.length ? lockInTasks.map(({ task, tag }) => renderTaskRow(task, tag, true)) : <div className="empty-state"><FileText size={19} /><span>No lock-in task right now.</span></div>}
+          {lockInTasks.length ? lockInBuckets.flatMap(([tag, bucket]) => Array.from(bucket.reduce((groups, item) => {
+            const group = groups.get(item.task.category) ?? [];
+            group.push(item);
+            groups.set(item.task.category, group);
+            return groups;
+          }, new Map<TaskCategory, { task: FlexibleTask; tag: string }[]>())).map(([category, items]) => {
+            if (items.length < 2) return items.map(({ task }) => renderTaskRow(task, tag, true));
+            const clusterKey = `${tag}:${category}`;
+            const expanded = expandedLockInClusters[clusterKey] !== false;
+            const combinedHours = items.reduce((sum, { task }) => sum + task.estimatedHours, 0);
+            return <div className="lock-in-cluster" key={clusterKey}><div className={`lock-in-cluster-bucket lock-in-tag lock-in-tag-${tag.toLowerCase().replace(/[^a-z]/g, "")}`}>{tag}</div><button type="button" className="lock-in-cluster-header" aria-expanded={expanded} onClick={() => setExpandedLockInClusters((current) => ({ ...current, [clusterKey]: !expanded }))}><span> <ChevronDown size={15} className={expanded ? "lock-in-cluster-chevron" : "lock-in-cluster-chevron lock-in-cluster-chevron-collapsed"} /><strong>{categoryLabel(category)} load</strong> · {items.length} tasks · {formatHours(combinedHours)}</span></button>{expanded && <div className="lock-in-cluster-items">{items.map(({ task }) => renderTaskRow(task, undefined, true))}</div>}</div>;
+          })) : <div className="empty-state"><FileText size={19} /><span>No lock-in task right now.</span></div>}
           {nextBlock ? <div className="task-row"><div className="task-leading"><span className="lock-in-tag lock-in-tag-recovery">Recovery</span><div className="task-icon task-icon-recovery"><LockKeyhole size={15} /></div><div><strong>{nextBlock.type}</strong><span>{nextBlock.day} · {nextBlock.startTime}–{nextBlock.endTime}</span></div></div></div> : <div className="task-row"><div className="task-leading"><span className="lock-in-tag lock-in-tag-recovery">Recovery</span><div className="task-icon task-icon-recovery"><LockKeyhole size={15} /></div><div><strong>No recovery block locked yet</strong><span>Protect one before the week fills up.</span></div></div><button className="text-action" onClick={onPlanner}>Open planner</button></div>}
         </div>
       </section>
