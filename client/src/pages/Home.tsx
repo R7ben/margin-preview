@@ -24,6 +24,7 @@ import {
   Home,
   Info,
   Leaf,
+  LayoutGrid,
   LockKeyhole,
   Menu,
   MessageCircleQuestion,
@@ -532,6 +533,24 @@ const categoryIcon = (category: TaskCategory) => {
   if (category === "errands") return ClipboardList;
   return Brain;
 };
+
+type LockInTaskItem = { task: FlexibleTask; tag: string };
+type LockInTaskGroup = { category: TaskCategory; items: LockInTaskItem[] };
+type LockInTaskBucket = { tag: string; groups: LockInTaskGroup[] };
+const groupLockInTasks = (items: LockInTaskItem[]): LockInTaskBucket[] => Array.from(items.reduce((buckets, item) => {
+  const bucket = buckets.get(item.tag) ?? [];
+  bucket.push(item);
+  buckets.set(item.tag, bucket);
+  return buckets;
+}, new Map<string, LockInTaskItem[]>())).map(([tag, bucket]) => ({
+  tag,
+  groups: Array.from(bucket.reduce((groups, item) => {
+    const group = groups.get(item.task.category) ?? [];
+    group.push(item);
+    groups.set(item.task.category, group);
+    return groups;
+  }, new Map<TaskCategory, LockInTaskItem[]>())).map(([category, groupedItems]) => ({ category, items: groupedItems })),
+}));
 
 const cognitiveRank: Record<CognitiveLoad, number> = { High: 3, Medium: 2, Low: 1 };
 
@@ -2006,6 +2025,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     date.setHours(0, 0, 0, 0);
     return date;
   });
+  const [showClusterMap, setShowClusterMap] = useState(false);
   const [expandedLockInClusters, setExpandedLockInClusters] = useState<Record<string, boolean>>({});
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [expandedDeadlineIds, setExpandedDeadlineIds] = useState<number[]>([]);
@@ -2054,12 +2074,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     const bucketRank = (tag: string) => tag === "Must-do" ? 0 : 1;
     return bucketRank(a.tag) - bucketRank(b.tag) || urgencyRank[aUrgency.tier] - urgencyRank[bUrgency.tier] || a.task.estimatedHours - b.task.estimatedHours;
   });
-  const lockInBuckets = Array.from(lockInTasks.reduce((buckets, item) => {
-    const bucket = buckets.get(item.tag) ?? [];
-    bucket.push(item);
-    buckets.set(item.tag, bucket);
-    return buckets;
-  }, new Map<string, { task: FlexibleTask; tag: string }[]>()));
+  const lockInBuckets = groupLockInTasks(lockInTasks);
   useEffect(() => {
     if (!showDeprioritizedBanner || lastToastTaskId === null) return;
     if (lockInTasks.some(({ task }) => task.id === lastToastTaskId)) onDismissDeprioritizedBanner();
@@ -2142,15 +2157,10 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     {!showFullWeek ? (
       <section className="card tasks-panel lock-in-panel">
         {showDeprioritizedBanner && <div className="lockin-note" role="status"><span>Added — didn't make today's top 2.</span><button className="text-button" onClick={() => setShowFullWeek(true)}>See full list</button><button className="icon-button" aria-label="Dismiss added task notice" onClick={onDismissDeprioritizedBanner}><X size={14} /></button></div>}
-        <div className="tasks-head"><div><span className="card-label">Today's Lock In</span><p className="card-subtitle">Things that matter most</p><div className="lock-in-legend"><span><i className="lock-in-legend-dot lock-in-legend-today" />Today</span><span><i className="lock-in-legend-dot lock-in-legend-tomorrow" />Tomorrow</span><span><i className="lock-in-legend-dot lock-in-legend-week" />This week</span></div></div></div>
+        <div className="tasks-head"><div><span className="card-label">Today's Lock In</span><p className="card-subtitle">Things that matter most</p><div className="lock-in-legend"><span><i className="lock-in-legend-dot lock-in-legend-today" />Today</span><span><i className="lock-in-legend-dot lock-in-legend-tomorrow" />Tomorrow</span><span><i className="lock-in-legend-dot lock-in-legend-week" />This week</span></div></div><button type="button" className="icon-button lock-in-cluster-map-button" aria-label="Open task cluster map" title="Open task cluster map" onClick={() => setShowClusterMap(true)}><LayoutGrid size={17} /></button></div>
         {showQuickAdd ? <QuickAddForm onAdd={onAddQuickTask} onClose={() => setShowQuickAdd(false)} /> : <button type="button" className="quick-add-row" onClick={() => setShowQuickAdd(true)}><Plus size={16} /><span><strong>Quick add</strong><small>Name, day, and duration — keep it light.</small></span><ChevronDown size={15} /></button>}
         <div className="task-list">
-          {lockInTasks.length ? lockInBuckets.flatMap(([tag, bucket]) => Array.from(bucket.reduce((groups, item) => {
-            const group = groups.get(item.task.category) ?? [];
-            group.push(item);
-            groups.set(item.task.category, group);
-            return groups;
-          }, new Map<TaskCategory, { task: FlexibleTask; tag: string }[]>())).map(([category, items]) => {
+          {lockInTasks.length ? lockInBuckets.flatMap(({ tag, groups }) => groups.map(({ category, items }) => {
             if (items.length < 2) return items.map(({ task }) => renderTaskRow(task, tag, true));
             const clusterKey = `${tag}:${category}`;
             const expanded = expandedLockInClusters[clusterKey] !== false;
@@ -2178,6 +2188,21 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     <div className="quick-check-fab-wrap">
       {showFabHint && <span className="quick-check-fab-hint">Can I afford this?</span>}
       <button className="quick-check-fab" aria-label="Can I afford this? Quick check" onClick={() => { dismissFabHint(); onQuickCheck(); }}><MessageCircleQuestion size={22} /></button>
+    </div>
+    {showClusterMap && <TaskClusterMap buckets={lockInBuckets} onClose={() => setShowClusterMap(false)} />}
+  </div>;
+}
+
+function TaskClusterMap({ buckets, onClose }: { buckets: LockInTaskBucket[]; onClose: () => void }) {
+  return <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="task-cluster-map-title" onClick={onClose}>
+    <div className="modal-content task-cluster-map" onClick={(event) => event.stopPropagation()}>
+      <div className="sheet-head"><div><p className="eyebrow">Today's Lock In</p><h2 id="task-cluster-map-title">Task cluster map</h2><p>Flexible tasks grouped by category and load bucket.</p></div><button type="button" className="icon-button" aria-label="Close task cluster map" onClick={onClose}><X size={19} /></button></div>
+      <div className="task-cluster-grid">{buckets.flatMap(({ tag, groups }) => groups.map(({ category, items }) => {
+        const totalHours = items.reduce((sum, { task }) => sum + task.estimatedHours, 0);
+        return <section className="task-cluster-card" key={`${tag}:${category}`}><div className="task-cluster-card-head"><div><strong>{categoryLabel(category)}</strong><span>{tag} · {items.length} task{items.length === 1 ? "" : "s"}</span></div><b>{formatShortHours(totalHours)}</b></div><div className="task-cluster-chips">{items.map(({ task }) => <span className="task-cluster-chip" key={task.id}>{task.name}<small>{formatShortHours(task.estimatedHours)}</small></span>)}</div></section>;
+      }))}</div>
+      {!buckets.length && <div className="empty-state"><FileText size={19} /><span>No flexible tasks yet.</span></div>}
+      <button type="button" className="secondary-button" onClick={onClose}>Close</button>
     </div>
   </div>;
 }

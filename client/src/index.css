@@ -411,6 +411,20 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .task-row-urgent .deadline-sentence { color: #C1121F; font-weight: 500; }
 .empty-state { display: flex; align-items: center; gap: 10px; padding: 24px 0; color: var(--text-secondary); font-size: 12px; }
 .lock-in-panel .task-list { margin-top: 12px; }
+.lock-in-cluster-map-button { margin-left: auto; color: var(--teal); }
+.task-cluster-map { padding: 22px; }
+.task-cluster-map .sheet-head { margin-bottom: 18px; }
+.task-cluster-map .sheet-head p:last-child { margin: 5px 0 0; color: var(--text-secondary); font-size: 12px; }
+.task-cluster-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.task-cluster-card { padding: 13px; border: 1px solid var(--border-crisp); border-radius: 12px; background: var(--bg-primary); }
+.task-cluster-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 11px; }
+.task-cluster-card-head strong, .task-cluster-card-head span { display: block; }
+.task-cluster-card-head strong { color: var(--text-primary); font-size: 14px; }
+.task-cluster-card-head span { margin-top: 4px; color: var(--text-secondary); font-size: 10px; }
+.task-cluster-card-head b { color: var(--teal); font-size: 13px; white-space: nowrap; }
+.task-cluster-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.task-cluster-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid var(--border-crisp); border-radius: 999px; color: var(--text-primary); background: white; font-size: 11px; }
+.task-cluster-chip small { color: var(--text-secondary); font-size: 10px; }
 .quick-add-row { display: flex; width: 100%; min-height: 58px; align-items: center; gap: 11px; margin-top: 14px; padding: 10px 12px; color: var(--teal); border: 1px dashed var(--teal); border-radius: 12px; background: var(--pill-teal-bg); text-align: left; cursor: pointer; transition: background 180ms ease-out, transform 160ms ease-out; }
 .quick-add-row:hover { background: #CDEAE3; transform: translateY(-1px); }
 .quick-add-row > svg:last-child { margin-left: auto; color: var(--text-secondary); }
