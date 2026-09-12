@@ -121,8 +121,6 @@ Students stop accepting tasks blindly because they can *see and choose* the cost
 
 Our ideation happened mostly in a running WhatsApp thread alongside in-person mentor sessions and team meetups — not a single polished whiteboard session. The boards below are real screenshots from that process, in the order the thinking actually happened, including a feature we drafted in detail and then cut, and a live privacy self-correction mid-conversation.
 
-*Don't feel forced to add more than what's here — this is the honest trail, not a diagram quota.*
-
 | Board | Screenshot | What It Shows |
 |---|---|---|
 | **1. Early Brainstorm** — raw feature dump | https://drive.google.com/file/d/10PH753PoKIctO2ME3VZQd6M_OUTnYDI_/view?usp=sharing | Salmon Khan's initial brain-dump — dopamine/focus-mode mechanics, phone health-tracker integration, timetable upload, Google Calendar sync, and a "lifestyle balance wheel + deadline collision detector." Most of it didn't survive, but the timetable-upload and calendar-sync threads here became Import Fixed Commitments. |
@@ -231,7 +229,7 @@ No hard blocks. No hidden warnings. Just cost and choice, side by side.
 | **Hosting** | Vercel | Free tier with zero-config GitHub deployments. | Serverless cold-starts and function timeouts during the Gemini API roundtrip present a live risk. |
 
 **System Architecture Diagram:**
-https://drive.google.com/file/d/1q2hq3ELls_8B05EADAlSwfK4jOSJ6kfb/view?usp=sharing
+[System Architecture](https://drive.google.com/file/d/1q2hq3ELls_8B05EADAlSwfK4jOSJ6kfb/view?usp=sharing)
 
 Margin is a stateless, client-side-first prototype. All capacity calculations (Recovery Floor, Days at Risk, Consequence Preview, category clustering) run locally in the browser for real-time performance and privacy. The backend exists only to proxy Gemini API calls, keeping the API key secure. Refresh resets all state; this is intentional. A production version would add cross-session persistence and user accounts.
 
