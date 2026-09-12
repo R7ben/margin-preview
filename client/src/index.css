@@ -374,6 +374,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .btn-secondary-sm:hover { background: rgba(29,158,117,.08); }
 .side-note { margin: 12px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.55; }
 .category-breakdown-bar { display: flex; overflow: hidden; height: 12px; margin-top: 18px; border-radius: 6px; background: #E4E0EC; }
+.category-breakdown-lead { margin: 9px 0 0; color: var(--text-primary); font-size: 13px; line-height: 1.45; }
 .category-breakdown-segment { height: 100%; transition: width 300ms ease-out; }
 .category-breakdown-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 18px; }
 .category-breakdown-legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 500; }

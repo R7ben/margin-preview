@@ -2092,6 +2092,8 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
   const maxDailyMargin = Math.max(...calculation.dailyMargins, 1);
   const dailyCapacityTrend = calculation.dailyMargins.map((margin) => Math.round(Math.max(0, Math.min(1, (24 - margin) / 24)) * 100));
   const highCapacityDays = dailyCapacityTrend.filter((percent) => percent >= 85).length;
+  const highestLoadCategory = CATEGORY_BREAKDOWN_ITEMS.reduce((highest, item) => calculation.categoryBreakdown[item.key] > calculation.categoryBreakdown[highest.key] ? item : highest, CATEGORY_BREAKDOWN_ITEMS[0]);
+  const highestLoadHours = calculation.categoryBreakdown[highestLoadCategory.key];
   const riskAnalysis = analyzeWeekRisk(tasks, fixedCommitments, recoveryBlocks);
   const atRiskDays = riskAnalysis.filter((day) => day.riskLevel !== "low");
   const pressureDay = atRiskDays[0] ?? riskAnalysis[lowestDayIndex];
@@ -2102,6 +2104,20 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
       : pressureDay.load.social >= pressureDay.load.fixed
         ? "social commitments"
         : "fixed commitments";
+  const categoryBreakdownCard = <section className="card category-breakdown-card">
+    <span className="card-label">Available Capacity by Category</span>
+    <p className="category-breakdown-lead">Biggest pressure: {highestLoadCategory.label} load — {formatHours(highestLoadHours)} hours in this week's schedule.</p>
+    <div className="category-breakdown-bar">
+      {CATEGORY_BREAKDOWN_ITEMS.map((item) => {
+        const hours = calculation.categoryBreakdown[item.key];
+        const width = totalCategoryHours > 0 ? (hours / totalCategoryHours) * 100 : 0;
+        return width > 0 ? <div key={item.key} className="category-breakdown-segment" style={{ width: `${width}%`, background: item.color }} title={`${item.label}: ${formatHours(hours)}`} /> : null;
+      })}
+    </div>
+    <div className="category-breakdown-legend">
+      {CATEGORY_BREAKDOWN_ITEMS.map((item) => <div className="category-breakdown-legend-item" key={item.key}><span className="category-breakdown-dot" style={{ background: item.color }} />{item.label}<span className="category-breakdown-hours">{formatShortHours(calculation.categoryBreakdown[item.key])}</span></div>)}
+    </div>
+  </section>;
   return <div className="dashboard-page">
     {showMorningCheckIn && <section className="card checkin-card"><span className="card-label">How do you feel today?</span><div className="pill-row">{MOOD_OPTIONS.map((option) => <button key={option.value} className={`pill pill-button ${moodPillTone[option.value]}`} onClick={() => onMorningCheckInRespond(option.value)}>{option.value}</button>)}</div></section>}
     {recoveryQualityBlock && !recoveryQualityDismissed && <RecoveryQualityCard block={recoveryQualityBlock} onSelect={onRecoveryQuality} />}
@@ -2132,6 +2148,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
       {calculation.distributionWarning && <div className="distribution-warning"><TriangleAlert size={16} /> Recovery concentrated later in the week</div>}
       {calculation.margin <= 0 && <button className="triage-callout" onClick={onTriage}><TriangleAlert size={17} /> Recovery deficit detected <ArrowRight size={16} /></button>}
     </section>
+    {categoryBreakdownCard}
     {dailyView === "week" && <BurnoutRiskPanel atRiskDays={atRiskDays} onRebalance={onRebalance} />}
     <section className="card week-glance-card">
       <span className="card-label">Week at Glance</span>
@@ -2146,19 +2163,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
         return <div className="daily-slot" key={slot.key}><div className="daily-slot-head"><strong>{slot.label}</strong><span>{slot.time}</span></div>{slotCommitments.map((commitment) => <button type="button" className="daily-blocked-bar daily-blocked-bar-interactive" aria-label={`Edit or delete ${commitment.name}`} key={commitment.id} onClick={() => onOpenActionSheet({ kind: "fixed", item: commitment })}>Blocked · {commitment.name} · {commitment.startTime}–{commitment.endTime}</button>)}{slotTasks.length ? <div className="daily-task-chips">{slotTasks.map((task) => <button className={`daily-task-chip daily-task-chip-${task.category}`} key={task.id} onClick={() => onOpenActionSheet({ kind: "task", item: task })}>{task.name} · {formatShortHours(task.estimatedHours)}</button>)}</div> : <span className="daily-empty-slot">No tasks — margin available</span>}{slot.key === "evening" && dailyRecoveryBlocks.map((block) => <div className="daily-recovery-bar" key={block.id}>░░ Recovery block · {block.type} · {block.startTime}–{block.endTime}</div>)}</div>;
       })}
     </section>}
-    <section className="card category-breakdown-card">
-      <span className="card-label">Available Capacity by Category</span>
-      <div className="category-breakdown-bar">
-        {CATEGORY_BREAKDOWN_ITEMS.map((item) => {
-          const hours = calculation.categoryBreakdown[item.key];
-          const width = totalCategoryHours > 0 ? (hours / totalCategoryHours) * 100 : 0;
-          return width > 0 ? <div key={item.key} className="category-breakdown-segment" style={{ width: `${width}%`, background: item.color }} title={`${item.label}: ${formatHours(hours)}`} /> : null;
-        })}
-      </div>
-      <div className="category-breakdown-legend">
-        {CATEGORY_BREAKDOWN_ITEMS.map((item) => <div className="category-breakdown-legend-item" key={item.key}><span className="category-breakdown-dot" style={{ background: item.color }} />{item.label}<span className="category-breakdown-hours">{formatShortHours(calculation.categoryBreakdown[item.key])}</span></div>)}
-      </div>
-    </section>
+    {dailyView === "day" && categoryBreakdownCard}
     {showSurvivalPlan && <SurvivalPlanCard plan={weeklyPlan} onMoveTask={onMoveWeeklyTask} onLockBlock={onLockWeeklyBlock} onDismiss={onDismissSurvivalPlan} />}
     {!showFullWeek ? (
       <section className="card tasks-panel lock-in-panel">
