@@ -35,7 +35,7 @@ Students accept new academic, work, and social commitments without visibility in
 
 **Result:** Students burn out because they don't see the cost of a commitment until it's too late. By then, saying no is socially costly, and they've already overcommitted.
 
-**Primary Research:** We surveyed 37 university students. 70% confirmed they had overcommitted this semester, and a further 24% weren't sure — meaning 95% either experienced overload or lacked visibility into whether they had. 81% didn't recognize the overload until mid-week or later, by which point burnout was already the outcome for 59% of respondents.
+**Primary Research:** We surveyed 40 university students. 70% confirmed they had overcommitted this semester, and a further 22% weren't sure — meaning 92% either experienced overload or lacked visibility into whether they had. 80% didn't recognize the overload until mid-week or later, by which point burnout was already the outcome for 58% of respondents.
 
 ### Stakeholders
 
