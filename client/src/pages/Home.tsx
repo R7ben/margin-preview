@@ -2029,6 +2029,8 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     return date;
   });
   const [showClusterMap, setShowClusterMap] = useState(false);
+  const [showLockInHelp, setShowLockInHelp] = useState(false);
+  const lockInHelpRef = useRef<HTMLDivElement | null>(null);
   const [expandedLockInClusters, setExpandedLockInClusters] = useState<Record<string, boolean>>({});
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [expandedDeadlineIds, setExpandedDeadlineIds] = useState<number[]>([]);
@@ -2038,6 +2040,14 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     const timer = setTimeout(() => { setShowFabHint(false); window.localStorage.setItem("marginFabHintSeen", "1"); }, 3200);
     return () => clearTimeout(timer);
   }, [showFabHint]);
+  useEffect(() => {
+    if (!showLockInHelp) return;
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (lockInHelpRef.current && !lockInHelpRef.current.contains(event.target as Node)) setShowLockInHelp(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [showLockInHelp]);
   const dismissFabHint = () => { setShowFabHint(false); window.localStorage.setItem("marginFabHintSeen", "1"); };
   const status = calculation.status;
   const scale = Math.max(calculation.availableCapacity, calculation.flexTotal + Math.max(calculation.margin, 0), 1);
@@ -2175,7 +2185,7 @@ function Dashboard({ calculation, tasks, fixedCommitments, recoveryBlocks, showE
     {!showFullWeek ? (
       <section className="card tasks-panel lock-in-panel">
         {showDeprioritizedBanner && <div className="lockin-note" role="status"><span>Added — didn't make today's top 2.</span><button className="text-button" onClick={() => setShowFullWeek(true)}>See full list</button><button className="icon-button" aria-label="Dismiss added task notice" onClick={onDismissDeprioritizedBanner}><X size={14} /></button></div>}
-        <div className="tasks-head"><div><span className="card-label">Today's Lock In</span><p className="card-subtitle">Things that matter most</p><div className="lock-in-legend"><span><i className="lock-in-legend-dot lock-in-legend-today" />Today</span><span><i className="lock-in-legend-dot lock-in-legend-tomorrow" />Tomorrow</span><span><i className="lock-in-legend-dot lock-in-legend-week" />This week</span></div></div><button type="button" className="icon-button lock-in-cluster-map-button" aria-label="Open task cluster map" title="Open task cluster map" onClick={() => setShowClusterMap(true)}><LayoutGrid size={17} /></button></div>
+        <div className="tasks-head"><div><span className="card-label">Today's Lock In</span><p className="card-subtitle">Things that matter most</p><div className="lock-in-legend"><span><i className="lock-in-legend-dot lock-in-legend-today" />Today</span><span><i className="lock-in-legend-dot lock-in-legend-tomorrow" />Tomorrow</span><span><i className="lock-in-legend-dot lock-in-legend-week" />This week</span></div></div><div className="lock-in-header-actions"><div className="lock-in-help-wrap" ref={lockInHelpRef}><button type="button" className="icon-button lock-in-help-button" aria-label="How Today's Lock In works" aria-expanded={showLockInHelp} title="How Today's Lock In works" onClick={() => setShowLockInHelp((current) => !current)}>?</button>{showLockInHelp && <div className="lock-in-help-popover" role="dialog" aria-label="How Today's Lock In works"><div className="lock-in-help-popover-head"><strong>How Today’s Lock In works</strong><button type="button" className="icon-button" aria-label="Close Lock In explanation" onClick={() => setShowLockInHelp(false)}><X size={15} /></button></div><p>Tasks are automatically sorted into Must-Do and Maintenance based on urgency. Tasks sharing the same category — Mental, Physical, Social, Time, or Errands — are grouped together when there are 2 or more, showing combined hours.</p></div>}</div><button type="button" className="icon-button lock-in-cluster-map-button" aria-label="Open task cluster map" title="Open task cluster map" onClick={() => setShowClusterMap(true)}><LayoutGrid size={17} /></button></div></div>
         {showQuickAdd ? <QuickAddForm onAdd={onAddQuickTask} onClose={() => setShowQuickAdd(false)} /> : <button type="button" className="quick-add-row" onClick={() => setShowQuickAdd(true)}><Plus size={16} /><span><strong>Quick add</strong><small>Name, day, and duration — keep it light.</small></span><ChevronDown size={15} /></button>}
         <div className="task-list">
           {lockInTasks.length ? lockInBuckets.flatMap(({ tag, groups }) => groups.map(({ category, items }) => {

@@ -423,7 +423,15 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .task-row-urgent .deadline-sentence { color: #C1121F; font-weight: 500; }
 .empty-state { display: flex; align-items: center; gap: 10px; padding: 24px 0; color: var(--text-secondary); font-size: 12px; }
 .lock-in-panel .task-list { margin-top: 12px; }
-.lock-in-cluster-map-button { margin-left: auto; color: var(--teal); }
+.lock-in-header-actions { display: flex; flex: 0 0 auto; align-items: flex-start; gap: 5px; }
+.lock-in-help-wrap { position: relative; }
+.lock-in-help-button { width: 30px; height: 30px; color: var(--teal); border: 1px solid var(--border-crisp); border-radius: 50%; font-family: var(--font-mono); font-size: 14px; font-weight: 700; }
+.lock-in-help-button:hover, .lock-in-help-button:focus-visible { border-color: var(--teal); background: var(--pill-teal-bg); outline: none; }
+.lock-in-help-popover { position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; width: min(320px, calc(100vw - 48px)); padding: 14px; border: 1px solid var(--border-crisp); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 30px rgba(27,34,48,.16); text-align: left; }
+.lock-in-help-popover-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-primary); font-size: 12px; }
+.lock-in-help-popover-head .icon-button { width: 26px; height: 26px; flex: 0 0 auto; }
+.lock-in-help-popover p { margin: 9px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.lock-in-cluster-map-button { color: var(--teal); }
 .task-cluster-map { padding: 22px; }
 .task-cluster-map .sheet-head { margin-bottom: 18px; }
 .task-cluster-map .sheet-head p:last-child { margin: 5px 0 0; color: var(--text-secondary); font-size: 12px; }
@@ -765,6 +773,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 
 @media (max-width: 680px) {
   .load-panel-head, .tasks-head { display: block; }
+  .lock-in-header-actions { justify-content: flex-end; margin-top: 10px; }
   .quick-add-fields, .quick-add-full-options { grid-template-columns: 1fr; }
   .quick-add-full-options .quick-add-checkbox { grid-column: auto; }
   .quick-add-form-actions { flex-direction: column-reverse; }
