@@ -1,4 +1,4 @@
-# Margin by Apes Together Strong
+# Margin by Ape Together Strong
 
 **Track:** Track 1 — Lifestyle
 **Problem Statement:** Stress & Workload Manager
