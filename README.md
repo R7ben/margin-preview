@@ -9,9 +9,9 @@
 - Zaim Azraei bin Saiful Arif
 - MEGHAN LATCHUMANAN
 
-**Video Presentation:** [Unlisted YouTube Link — TBD]
+**Video Presentation:** https://youtu.be/4-h2xOOj9sQ
 
-**Presentation Slides:** [Public Link — TBD]
+**Presentation Slides:** https://canva.link/bqbed1nc87xh17t
 
 **Live Prototype:** [https://margin-preview-six.vercel.app/](https://margin-preview-six.vercel.app/)
 
