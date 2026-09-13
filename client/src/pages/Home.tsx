@@ -819,6 +819,7 @@ function App() {
   const [triageMarginOverride, setTriageMarginOverride] = useState<number | null>(null);
   const [triageOutcomeDeficit, setTriageOutcomeDeficit] = useState<number | null>(null);
   const [showQuickCheck, setShowQuickCheck] = useState(false);
+  const [quickCheckInitialQuestion, setQuickCheckInitialQuestion] = useState("");
   const [showRecoveryMenu, setShowRecoveryMenu] = useState(false);
   const [showConsequencePreview, setShowConsequencePreview] = useState(false);
   const [importFileName, setImportFileName] = useState("");
@@ -1532,6 +1533,13 @@ function App() {
   const openQuickCheck = () => {
     setQuickName("");
     setQuickHours(1);
+    setQuickCheckInitialQuestion("");
+    setShowQuickCheck(true);
+  };
+  const openQuickCheckWithQuestion = (question: string) => {
+    setQuickName("");
+    setQuickHours(1);
+    setQuickCheckInitialQuestion(question);
     setShowQuickCheck(true);
   };
 
@@ -1720,6 +1728,7 @@ function App() {
                   recoveryBlocks={recoveryBlocks}
                   onNextWeek={() => navTo("onboarding")}
                   onAdjust={() => navTo("onboarding")}
+                  onExplainPattern={openQuickCheckWithQuestion}
                 />
               )}
               {screen === "import" && (
@@ -1755,6 +1764,7 @@ function App() {
             moodCheckIns={moodCheckIns}
             energyCheckIns={energyCheckIns}
             taskOutcomes={taskOutcomes}
+            initialQuestion={quickCheckInitialQuestion}
             setName={setQuickName}
             setHours={setQuickHours}
             onClose={() => setShowQuickCheck(false)}
@@ -2521,7 +2531,7 @@ function Settings({ onBack }: { onBack: () => void }) {
   return <div className="settings-screen"><div className="settings-heading"><button className="text-button settings-back-button" onClick={onBack}><ArrowLeft size={14} /> Settings</button><h1>Settings</h1></div><section className="card settings-card"><span className="card-label">Appearance</span><div className="settings-group"><span className="settings-option-label">Theme</span><div className="theme-options"><button className={`theme-option ${theme === "light" ? "active" : ""}`} onClick={() => theme !== "light" && toggleTheme()}>☀️ Light</button><button className={`theme-option ${theme === "dark" ? "active" : ""}`} onClick={() => theme !== "dark" && toggleTheme()}>🌙 Dark</button></div><p className="settings-hint">Dark mode reduces eye strain before bed.</p></div><span className="card-label">Notifications</span><label className="settings-toggle-row"><span><strong>Mood Check Reminders</strong><small>Prompt you to log how you feel.</small></span><input type="checkbox" checked={notificationsEnabled} onChange={(event) => setNotificationsEnabled(event.target.checked)} /></label><div className="settings-option-group"><span className="settings-option-label">How often?</span><div className="interval-options">{intervalOptions.map((option) => <label key={`mood-${option.value}`}><input type="radio" name="notification-interval" value={option.value} checked={reminderInterval === option.value} onChange={(event) => setReminderInterval(event.target.value)} />{option.label}</label>)}</div></div><div className="settings-notification-block"><label className="settings-toggle-row"><span><strong>Recovery Check-ins</strong><small>Get notified about your recovery margin and easy ways to add tasks.</small></span><input type="checkbox" checked={taskPromptsEnabled} onChange={(event) => setTaskPromptsEnabled(event.target.checked)} /></label><div className="settings-option-group"><span className="settings-option-label">How often?</span><div className="interval-options">{intervalOptions.map((option) => <label key={`task-${option.value}`}><input type="radio" name="task-toast-interval" value={option.value} checked={taskPromptInterval === option.value} onChange={(event) => setTaskPromptInterval(event.target.value)} />{option.label}</label>)}</div></div></div><div className="settings-option-group"><span className="settings-option-label">Show recovery time as:</span><div className="interval-options"><label><input type="radio" name="recovery-frame-preference" value="week" checked={recoveryFramePreference === "week"} onChange={() => setRecoveryFramePreference("week")} />This week</label><label><input type="radio" name="recovery-frame-preference" value="day" checked={recoveryFramePreference === "day"} onChange={() => setRecoveryFramePreference("day")} />Today</label></div></div><button className="primary-button" onClick={handleSave}>Save preferences</button></section></div>;
 }
 
-function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, energyCheckIns, recoveryBlocks, onNextWeek, onAdjust }: { calculation: CalculationShape; overrideCount: number; taskOutcomes: TaskOutcomeRecord[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; recoveryBlocks: RecoveryBlock[]; onNextWeek: () => void; onAdjust: () => void }) {
+function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, energyCheckIns, recoveryBlocks, onNextWeek, onAdjust, onExplainPattern }: { calculation: CalculationShape; overrideCount: number; taskOutcomes: TaskOutcomeRecord[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; recoveryBlocks: RecoveryBlock[]; onNextWeek: () => void; onAdjust: () => void; onExplainPattern: (question: string) => void }) {
   const hardestIndex = calculation.dailyMargins.reduce((lowest, margin, index, margins) => margin < margins[lowest] ? index : lowest, 0);
   const maintained = Math.round(calculation.tier2Total);
   const floorProtectedDays = calculation.dailyMargins.filter((margin) => margin >= 0).length;
@@ -2552,6 +2562,9 @@ function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, en
       ? `You felt drained on ${drainedDays.map((day) => day.dayLabel).join(" and ")}, which overlaps with tight-margin days. Consider protecting more recovery time there.`
       : "Your mood pattern will become clearer as you log more checks alongside your recovery plan.";
   const recoveryQualityLabel = avgCheckInScore === null ? "On track" : avgCheckInScore < 2 ? "At risk" : avgCheckInScore < 3 ? "Tight" : "On track";
+  const stressFloorBreaches = stressData.filter((day) => day.isAboveFloor).length;
+  const stressFloorBreachLabel = `${stressFloorBreaches} recovery floor breach${stressFloorBreaches === 1 ? "" : "es"}`;
+  const explainPatternQuestion = `Why was ${DAYS[hardestIndex]} my toughest day this week, with ${stressFloorBreachLabel}, and what does my ${moodTrendText.replace(/^[↗↘→] /, "")} mood trend suggest for next week?`;
   return <div className="reflection-page">
     <div className="screen-title-block"><h1>Week 36 Reflection</h1></div>
     <section className="card reflection-message-card">
@@ -2576,7 +2589,7 @@ function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, en
     <section className="card stress-pattern">
       <span className="card-label">Stress Pattern</span>
       <div className="stress-pattern-list">{last7Days.map((day) => <div className="stress-pattern-row" key={day.dayLabel}><span className="stress-pattern-day">{day.dayLabel}</span><span className="stress-pattern-value">{day.average === null ? "No check-in" : `${moodDotsForAverage(day.average)} ${day.average.toFixed(1)} · ${moodLabelForAverage(day.average)}`}</span></div>)}</div>
-      <p className="stress-pattern-insight">{moodRecoveryInsight}</p><button className="btn-expand" onClick={() => setShowStressChart(true)}>📈 Expand chart</button>
+      <p className="stress-pattern-insight">{moodRecoveryInsight}</p><div className="stress-pattern-actions"><button className="btn-expand" onClick={() => setShowStressChart(true)}>📈 Expand chart</button><button className="btn-expand" onClick={() => onExplainPattern(explainPatternQuestion)}>Explain the pattern</button></div>
     </section>{showStressChart && <div className="modal-overlay" onClick={() => setShowStressChart(false)}><div className="modal-content" onClick={(event) => event.stopPropagation()}><StressPatternChart stressData={stressData} recoveryTarget={7} onClose={() => setShowStressChart(false)} /></div></div>}
     <section className="card reflection-insight-card">
       <div className="insight-row"><Moon size={16} /><span><strong>This week's goal</strong><small>Your hardest day: {DAYS[hardestIndex]}. Consider protecting {DAYS[hardestIndex]} evening.</small></span></div>
@@ -2588,7 +2601,7 @@ function Reflection({ calculation, overrideCount, taskOutcomes, moodCheckIns, en
 
 function MetricCard({ icon, label, value, subLabel, mark, tone }: { icon: ReactNode; label: string; value: string; subLabel?: string; mark: string; tone: "blue" | "green" | "amber" | "red" | "muted" }) { return <div className={`metric-card metric-${tone}`}><div className="metric-label">{icon}<span>{label}</span></div><div className="metric-value">{value}<span>{mark}</span></div>{subLabel && <p className="metric-sub-label">{subLabel}</p>}</div>; }
 
-function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHours, energyCheckIn, tasks, moodCheckIns, energyCheckIns, taskOutcomes, setName, setHours, onClose, onAdd }: { name: string; hours: number; suggestion: Suggestion; calculation: CalculationShape; sleepHours: number; decompHours: number; energyCheckIn: EnergyCheckIn | null; tasks: FlexibleTask[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; taskOutcomes: TaskOutcomeRecord[]; setName: (value: string) => void; setHours: (value: number) => void; onClose: () => void; onAdd: () => void }) {
+function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHours, energyCheckIn, tasks, moodCheckIns, energyCheckIns, taskOutcomes, initialQuestion = "", setName, setHours, onClose, onAdd }: { name: string; hours: number; suggestion: Suggestion; calculation: CalculationShape; sleepHours: number; decompHours: number; energyCheckIn: EnergyCheckIn | null; tasks: FlexibleTask[]; moodCheckIns: MoodCheckIn[]; energyCheckIns: EnergyCheckIn[]; taskOutcomes: TaskOutcomeRecord[]; initialQuestion?: string; setName: (value: string) => void; setHours: (value: number) => void; onClose: () => void; onAdd: () => void }) {
   const projected = calculation.margin - hours;
   const status = statusFor(projected);
   const showSleep = projected < 0;
@@ -2596,7 +2609,7 @@ function QuickCheck({ name, hours, suggestion, calculation, sleepHours, decompHo
   const risk = useMemo(() => predictBurnoutRisk({ calculation, moodCheckIns, energyCheckIns }), [calculation, moodCheckIns, energyCheckIns]);
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
+  const [chatInput, setChatInput] = useState(initialQuestion);
   const [chatLoading, setChatLoading] = useState(false);
   const threadRef = useRef<HTMLDivElement | null>(null);
 

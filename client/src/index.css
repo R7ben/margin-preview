@@ -717,6 +717,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .weekly-mood-summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-crisp); color: #1F8A82; font-size: 11px; }
 .weekly-mood-summary strong { color: var(--text-primary); }
 .stress-pattern-insight { margin: 14px 0 0; padding: 12px; color: #0E5449; border-left: 3px solid #1F8A82; background: #DCF1EC; font-size: 11px; line-height: 1.5; }
+.stress-pattern-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .btn-expand { margin-top: 12px; padding: 8px 16px; color: #1D9E75; border: 1px solid #1D9E75; border-radius: 6px; background: rgba(29,158,117,.1); font-size: 12px; font-weight: 600; cursor: pointer; }
 .btn-expand:hover { background: rgba(29,158,117,.2); }
 .modal-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 18px; background: rgba(0,0,0,.5); }
