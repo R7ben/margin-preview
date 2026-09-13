@@ -5,7 +5,9 @@
 
 **Team:**
 - Sapttaruben A/L Krishnan
-- 
+- SAYED SALMAN FARIZ BIN SAYED SULTAN IBRAHIM
+- Zaim Azraei bin Saiful Arif
+- MEGHAN LATCHUMANAN
 
 **Video Presentation:** [Unlisted YouTube Link — TBD]
 
