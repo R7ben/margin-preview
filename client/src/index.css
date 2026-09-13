@@ -314,7 +314,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .hero-status-summary { display: flex; width: 100%; flex-direction: column; gap: 5px; margin: 18px 0 2px; color: var(--text-primary); text-align: left; }
 .hero-status-summary strong { font-size: 16px; line-height: 1.3; letter-spacing: -.01em; }
 .hero-status-summary span { color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
-.progress-ring-wrap { position: relative; display: flex; align-items: center; justify-content: center; width: 200px; height: 200px; margin: 20px auto 8px; }
+.progress-ring-wrap { position: relative; display: flex; align-items: center; justify-content: center; width: 200px; height: 200px; margin: 20px auto 38px; }
 .week-glance-card { display: flex; flex-direction: column; }
 .week-glance-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
 .week-glance-row { display: flex; align-items: center; gap: 12px; }
@@ -350,6 +350,7 @@ input[type="range"]::-webkit-slider-thumb { margin-top: -6px; width: 16px; heigh
 .progress-ring-track { fill: none; stroke: var(--border-crisp); stroke-width: 14; }
 .progress-ring-fill { fill: none; stroke-width: 14; stroke-linecap: round; transition: stroke-dashoffset 500ms cubic-bezier(.23,1,.32,1), stroke 300ms ease-out; }
 .progress-ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.progress-ring-center .trend-copy { position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%); white-space: nowrap; }
 .margin-number { font-size: clamp(40px, 6vw, 54px); font-weight: 700; letter-spacing: -.04em; line-height: .9; transition: color 300ms ease-out; }
 .margin-hours-secondary { margin: 0; color: var(--text-secondary); font-size: 13px; font-weight: 500; }
 .hero-substat { margin: 6px 0 0; max-width: 320px; color: var(--text-secondary); font-size: 12px; line-height: 1.55; }
