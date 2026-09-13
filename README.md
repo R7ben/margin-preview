@@ -27,15 +27,15 @@
 
 Students accept new academic, work, and social commitments without visibility into whether they have the *capacity* to handle them. Three specific failures in existing systems enable this:
 
-1. **Rest is treated as leftover time, not a protected baseline.** After scheduling tasks, "free time" is what remains — but free time ≠ recovered time. A student can be 0% booked and still be at 100% mental/physical load from accumulated stress. Existing tools optimize for hours available, not recovery needed.
+1. **Rest is treated as leftover time, not a protected baseline.** After scheduling tasks, "free time" is what remains but free time ≠ recovered time. A student can be 0% booked and still be at 100% mental/physical load from accumulated stress. Existing tools optimize for hours available, not recovery needed.
 
 2. **Workload is measured in a single dimension (hours), not across lived dimensions.** A student's week includes mental load (problem sets, exams), physical load (commute, work shifts), social load (group projects, obligations), time load (concurrent deadlines), and maintenance (errands, basic care). Tools that show only "you have 5 hours free" miss the full picture.
 
-3. **Warning systems act *after* overcommitment, not before.** By the time a calendar shows "you're overbooked," the student has already said yes. The tool can't change the decision; it can only reflect the damage.
+3. **Warning systems act *after* overcommitment, not before.** By the time a calendar shows "you're overbooked," the student has already said yes. The tool can't change the decision, it can only reflect the damage.
 
 **Result:** Students burn out because they don't see the cost of a commitment until it's too late. By then, saying no is socially costly, and they've already overcommitted.
 
-**Primary Research:** We surveyed 40 university students. 70% confirmed they had overcommitted this semester, and a further 22% weren't sure — meaning 92% either experienced overload or lacked visibility into whether they had. 80% didn't recognize the overload until mid-week or later, by which point burnout was already the outcome for 58% of respondents.
+**Primary Research:** We surveyed 40 university students. 70% confirmed they had overcommitted this semester, and a further 22% weren't sure , meaning 92% either experienced overload or lacked visibility into whether they had. 80% didn't recognize the overload until midweek or later, by which point burnout was already the outcome for 58% of respondents.
 
 ### Stakeholders
 
@@ -46,14 +46,14 @@ Students accept new academic, work, and social commitments without visibility in
 
 Every competitor in this space falls into one of two camps:
 
-- **Passive trackers** (e.g., MyStudyLife, Structured, Tiimo): Show workload after tasks are added. Useful for retrospective analysis; useless for preventing overcommitment.
-- **Reactive optimizers** (e.g., Sunsama, Motion, Finch): Act on time/deadlines only — "you have a deadline Thursday, so defer Task X to Monday." But this doesn't account for recovery state. A student might defer a deadline and still be at 110% capacity from prior high-load days.
+- **Passive trackers** (MyStudyLife, Structured, Tiimo): Show workload after tasks are added. Useful for retrospective analysis but useless for preventing overcommitment.
+- **Reactive optimizers** (Sunsama, Motion, Finch): Act on time/deadlines only, "you have a deadline Thursday, so defer Task X to Monday." But this doesn't account for recovery state. A student might defer a deadline and still be at 110% capacity from prior high-load days.
 
 None protect recovery as a *non-negotiable baseline*, and none evaluate a *specific* task against a student's *actual* schedule and *actual* capacity state before the student commits to it.
 
 ### 1.2 Our Solution
 
-**Margin is a recovery-first workload manager that makes the cost of a new task visible *before* you accept it.** Instead of showing "you have 5 hours free," Margin shows: *"Your recovery floor (sleep, decompression) is protected at 56 hours this week. You have 4 mental-load tasks due Thursday already. Adding this task would push Thursday to 98% capacity and break your recovery floor. You can still add it — the choice is yours — but you can see the cost first."*
+**Margin is a recovery-first workload manager that makes the cost of a new task visible *before* you accept it.** Instead of showing "you have 5 hours free," Margin shows: *"Your recovery floor (sleep, decompression) is protected at 56 hours this week. You have 4 mental-load tasks due Thursday already. Adding this task would push Thursday to 98% capacity and break your recovery floor. You can still add it , the choice is yours , but you can see the cost first."*
 
 Recovery is a fixed cost, not a luxury. Capacity is visible across dimensions (mental, physical, social, time, errands), not just hours. And the decision to overcommit is *yours*, made with full information, not made by default because you didn't see it coming.
 
@@ -61,10 +61,10 @@ Recovery is a fixed cost, not a luxury. Capacity is visible across dimensions (m
 
 | # | Core Feature | Description & Operational Value |
 |---|---|---|
-| 1 | **Recovery Floor as Protected Baseline** | Sleep and decompression subtracted first; available capacity is strictly what remains. |
+| 1 | **Recovery Floor as Protected Baseline** | Sleep and decompression subtracted first, available capacity is strictly what remains. |
 | 2 | **Workload Visualizer (Multi-Category)** | Mental, Physical, Social, Time, and Errands load tracked separately, not folded into hours. |
 | 3 | **Days at Risk Flagging** | Days that breach recovery capacity are proactively flagged with rebalancing suggestions. |
-| 4 | **Quick Check ("Can I Afford This?")** | Natural-language query about a specific task; returns computed burnout-risk delta against your live schedule. |
+| 4 | **Quick Check ("Can I Afford This?")** | Natural-language query about a specific task, returns computed burnout-risk delta against your live schedule. |
 | 5 | **Consequence Preview Modal** | Before adding a task, see before-and-after capacity impact with choice: Add Anyway, Reschedule, or See Impact. |
 | 6 | **Category-Based Task Clustering** | Tasks grouped by load type within buckets, collapsible headers show combined hours for clarity. |
 | 7 | **Import Fixed Commitments** | Upload your timetable (lectures, work shifts) so capacity is grounded in reality, not theory. |
@@ -86,7 +86,7 @@ Students stop accepting tasks blindly because they can *see and choose* the cost
 
 | # | Idea / Feature | Strategic & Architectural Rationale | Evidence & Implementation |
 |---|---|---|---|
-| 1 | Recovery Floor as Protected Baseline | Core architectural inversion. Rest is subtracted *first* as a non-negotiable floor, making true remaining capacity visible. | Mentor-validated; live in build; primary real estate on Today view. |
+| 1 | Recovery Floor as Protected Baseline | Core architectural inversion. Rest is subtracted *first* as a non-negotiable floor, making true remaining capacity visible. | Mentor-validated, live in build, primary real estate on Today view. |
 | 2 | Workload Visualizer (Multi-Category) | Tracks Mental, Physical, Social, Time, and Errands load independently rather than folding energy into raw time. | Live and tested; multi-dimensional capacity breakdown rendered on client. |
 | 3 | Days at Risk Flagging | Proactively identifies days breaching recovery floors and recommends rebalancing actions. | Live and tested; Thursday threshold breach successfully flagged in demo. |
 | 4 | Quick Check ("Can I Afford This?") | Evaluates new task impact against live schedule before commitment, generating a burnout-risk delta. | Highlighted as load-bearing by mentors; live and verified. |
