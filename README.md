@@ -98,7 +98,8 @@ Students stop accepting tasks blindly because they can *see and choose* the cost
 | 10 | Task "Easier Options" (Split/Defer/Find-Slot) | Offers lower-friction alternatives prior to hard entry to encourage proactive schedule adjustment. | Integrated into Consequence Preview modal flow. Live in build. |
 | 11 | Recovery Planner (Auto-Suggest Blocks) | Auto-generates recovery blocks (physical break, screen-free wind-down) after 2+ consecutive heavy days. | Live in build; Protect/Edit/Lock-all batch controls verified. |
 | 12 | Speech-to-Text Input | Provides voice input across task creation and chat interfaces to lower interaction friction. | Live and functional in build; improves task entry speed. |
-| 13 | Cluster Map Popover *(Conditional)* | Icon button on Today view opening a modal with category tasks rendered as visual clusters. | Stretch goal; reuses existing category logic for low-risk visual enhancement. |
+| 13 | Cluster Map Popover  | Icon button on Today view opening a modal with category tasks rendered as visual clusters. | Stretch goal, reuses existing category logic for low-risk visual enhancement. |
+| 14 | Recovery Quality Self-Report | Morning check-in rating recovery efficacy; deprioritized to preserve low-friction core workflow. | "Physical break yesterday — Did it restore you? Fully/Partially/Not really" |
 
 #### Dropped Ideas & Scope Cuts
 
@@ -109,7 +110,7 @@ Students stop accepting tasks blindly because they can *see and choose* the cost
 | C | User Accounts & Cross-Session Persistence | Deferred to post-prototype build. Focuses build cycles on UI/interaction validation over database auth overhead. | Explicit scope discipline decision; state isolated strictly to browser session. |
 | D | Google Calendar Full Sync | Avoids OAuth and API integration scope creep during build crunch; file upload provides equal validation. | Sept 7 mentor session recommendation; replaced with timetable file upload. |
 | E | Advisor-Suggested Reframe | Proposed reframing Margin as a general decision tool; rejected because it weakened the recovery-first foundation. | Tested against system architecture and rejected to keep non-negotiable rest baseline. |
-| F | Recovery Quality Self-Report | Morning check-in rating recovery efficacy; deprioritized to preserve low-friction core workflow. | Classified as non-essential stretch item; cut due to build timeline constraints. |
+
 
 #### Decision Framework & Ideation Insights
 
@@ -223,8 +224,8 @@ No hard blocks. No hidden warnings. Just cost and choice, side by side.
 | **Frontend** | React 19 + Vite + TypeScript | Fast dev loop; TypeScript catches state-shape bugs in a capacity-calculation-heavy app. | Monolithic Home.tsx holding all screen components (speed tradeoff for the build window). |
 | **Styling / UI** | Tailwind CSS v4 + shadcn/ui (new-york style) | Provides component primitives without needing to build a custom design system under time pressure. | — |
 | **Routing** | wouter | Lightweight alternative to React Router; the application has too few screens to justify a full router setup. | — |
-| **Backend** | Express | Proxies the Gemini API call server-side so the API key is not exposed to the client. | Running as a Vercel serverless function. |
-| **AI** | Google Gemini (free tier) | Powers the "Quick Check" feature's natural-language burnout reasoning. | Server-side proxy migration completed to prevent client-side key exposure. |
+| **Backend** | Express | Serves static files on Vercel. | Running as a Vercel serverless function. |
+| **AI** | Google Gemini (free tier) | Powers the "Quick Check" feature's natural-language burnout reasoning. | API calls currently made directly from the browser; server-side proxy is the clear next step for production. |
 | **Database** | None | Deliberate scope cut; prototype phase focuses on UI and interaction validation rather than infrastructure. | All state is browser-session only (no cross-session history, multi-device support, or real user accounts). |
 | **Hosting** | Vercel | Free tier with zero-config GitHub deployments. | Serverless cold-starts and function timeouts during the Gemini API roundtrip present a live risk. |
 
